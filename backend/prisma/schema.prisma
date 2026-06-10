@@ -1,0 +1,92 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String   @id @default(uuid())
+  email             String   @unique
+  passwordHash      String
+  name              String
+  role              String   @default("USER")
+  preferredLanguage String   @default("en")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  uploads           Upload[]
+}
+
+model Upload {
+  id            String   @id @default(uuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileUrl       String?
+  fileType      String
+  parsedText    String
+  ocrConfidence Float    @default(0.0)
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Medicine {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  genericName    String
+  composition    String
+  manufacturer   String
+  description    String
+  safetyCategory String
+  dosageForms    String
+  sideEffects    String
+  interactions   String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Disease {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  symptoms    String
+  precautions String
+  createdAt   DateTime @default(now())
+}
+
+model LabRange {
+  id          String   @id @default(uuid())
+  markerName  String   @unique
+  unit        String
+  minRange    Float
+  maxRange    Float
+  category    String
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model Myth {
+  id                 String   @id @default(uuid())
+  forwardText        String
+  originalClaim      String?
+  classification     String
+  confidenceScore    Float    @default(0.0)
+  fearScore          Float    @default(0.0)
+  isDangerous        Boolean  @default(false)
+  correctionText     String
+  shareableDebunkUrl String?
+  verifiedClaims     String
+  createdAt          DateTime @default(now())
+}
+
+model MultilingualContent {
+  id              String   @id @default(uuid())
+  key             String
+  language        String
+  translationText String
+  createdAt       DateTime @default(now())
+
+  @@unique([key, language])
+}
