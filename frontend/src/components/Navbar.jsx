@@ -78,11 +78,11 @@ export default function Navbar({ activeTab, setActiveTab }) {
     const lang = e.target.value;
     i18n.changeLanguage(lang);
     const text = t('speech.langChanged', { name: languages.find(l => l.code === lang)?.name, lng: lang });
-    speakText(text, lang);
+    speakText(text, lang, true);
   };
 
   const handleNarrateNav = () => {
-    speakText(t('speech.intro'), i18n.language);
+    speakText(t('speech.intro'), i18n.language, true);
   };
 
   const handleLogout = () => {
@@ -180,7 +180,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           onClick={() => {
             dispatch(toggleElderlyMode());
             const text = !elderlyMode ? t('speech.elderlyEnabled') : t('speech.elderlyDisabled');
-            speakText(text, i18n.language);
+            speakText(text, i18n.language, true);
           }}
           className="p-2 sm:px-3 sm:py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5"
           style={elderlyMode ? {

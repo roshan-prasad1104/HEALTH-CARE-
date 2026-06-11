@@ -62,7 +62,8 @@ export default function LabAnalyzer() {
   const lastReadResultRef = React.useRef(null);
 
   const handleReadAloud = (forcePlay = false) => {
-    if (isPlayingSpeech && !forcePlay) {
+    const isAutoTrigger = forcePlay === true;
+    if (isPlayingSpeech && !isAutoTrigger) {
       stopSpeaking();
       return;
     }
@@ -82,7 +83,7 @@ export default function LabAnalyzer() {
     if (result.safetyDisclaimer) {
       speakParts.push(result.safetyDisclaimer);
     }
-    speakText(speakParts.join(' '), i18n.language);
+    speakText(speakParts.join(' '), i18n.language, !isAutoTrigger);
   };
 
   useEffect(() => {

@@ -122,7 +122,8 @@ export default function WhatsAppScanner() {
   const lastReadResultRef = React.useRef(null);
 
   const handleReadAloud = (forcePlay = false) => {
-    if (isPlayingSpeech && !forcePlay) {
+    const isAutoTrigger = forcePlay === true;
+    if (isPlayingSpeech && !isAutoTrigger) {
       stopSpeaking();
       return;
     }
@@ -136,7 +137,7 @@ export default function WhatsAppScanner() {
       `${getLocalizedLabel('originalClaimMapped', i18n.language)}: ${result.originalClaim}.`,
       `${t('scanner.correction')}: ${result.correctionText}.`
     ];
-    speakText(speakParts.join(' '), i18n.language);
+    speakText(speakParts.join(' '), i18n.language, !isAutoTrigger);
   };
 
   useEffect(() => {

@@ -10,7 +10,7 @@ export default function Dashboard({ setActiveTab }) {
   const { getHoverSpeechProps, speakText } = useAccessibility();
 
   const handleReadIntroduction = () => {
-    speakText(t('speech.intro'), i18n.language);
+    speakText(t('speech.intro'), i18n.language, true);
   };
 
   const stats = [

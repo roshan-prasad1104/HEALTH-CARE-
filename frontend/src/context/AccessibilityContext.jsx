@@ -108,10 +108,10 @@ export const AccessibilityProvider = ({ children }) => {
     });
   };
 
-  const speakText = (text, lang = 'en') => {
+  const speakText = (text, lang = 'en', force = false) => {
     if (!text) return;
-    // Respect the soundAlerts setting — silently skip if user turned off sound
-    if (!soundAlerts) return;
+    // Respect the soundAlerts setting — silently skip if user turned off sound, unless forced
+    if (!soundAlerts && !force) return;
     
     // Stop any active speech or audio
     if (typeof window.speechSynthesis !== 'undefined') {

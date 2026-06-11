@@ -20,7 +20,8 @@ export default function PrescriptionDecoder() {
   const lastReadResultRef = React.useRef(null);
 
   const handleReadAloud = (forcePlay = false) => {
-    if (isPlayingSpeech && !forcePlay) {
+    const isAutoTrigger = forcePlay === true;
+    if (isPlayingSpeech && !isAutoTrigger) {
       stopSpeaking();
       return;
     }
@@ -43,7 +44,7 @@ export default function PrescriptionDecoder() {
     if (result.safetyGuardrails) {
       speakParts.push(result.safetyGuardrails);
     }
-    speakText(speakParts.join(' '), i18n.language);
+    speakText(speakParts.join(' '), i18n.language, !isAutoTrigger);
   };
 
   useEffect(() => {

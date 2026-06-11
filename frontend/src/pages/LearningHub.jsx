@@ -92,7 +92,7 @@ export default function LearningHub() {
       stopSpeaking();
       setReadingId(null);
     } else {
-      speakText(text, i18n.language);
+      speakText(text, i18n.language, true);
       setReadingId(id);
     }
   };
@@ -225,7 +225,7 @@ export default function LearningHub() {
                       const optionsText = questions[currentQuestionIndex].optionsKeys
                         .map((key, i) => `${i + 1}: ${t(key)}`)
                         .join('. ');
-                      speakText(`${t(questions[currentQuestionIndex].questionKey)}. Options are: ${optionsText}`, i18n.language);
+                      speakText(`${t(questions[currentQuestionIndex].questionKey)}. Options are: ${optionsText}`, i18n.language, true);
                     }}
                     className="px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 text-[10px]"
                     style={{
