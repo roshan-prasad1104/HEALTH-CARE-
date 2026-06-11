@@ -155,7 +155,7 @@ export const AccessibilityProvider = ({ children }) => {
     if (isNativeSupported) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = targetLang;
-      utterance.rate = elderlyMode ? 0.75 : 0.9;
+      utterance.rate = elderlyMode ? 0.85 : 1.0;
       utterance.pitch = 1.05;
       utterance.voice = voice;
 
