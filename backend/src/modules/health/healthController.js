@@ -74,6 +74,35 @@ async function queryOpenFda(medicineName) {
   });
 }
 
+/**
+ * Query Gemini to get correct clinical details for a medicine as a fallback
+ */
+async function getMedicineDetailsFromGemini(medicineName) {
+  const systemInstruction = `
+    You are a clinical pharmacology model. Given a medicine name, return a JSON object with its correct clinical details.
+    
+    Output format MUST be JSON matching this exact structure:
+    {
+      "genericName": "Generic name of the medicine",
+      "description": "Short description of the medicine and its primary use cases.",
+      "safetyCategory": "Safe" | "Caution" | "High Risk",
+      "sideEffects": ["side effect 1", "side effect 2", "side effect 3"],
+      "interactions": ["drug interaction 1", "drug interaction 2"]
+    }
+    Output JSON only. No markdown formatting around JSON.
+  `;
+
+  try {
+    const rawResponse = await generateAIResponse(medicineName, systemInstruction, true);
+    const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanJson);
+  } catch (err) {
+    console.error('Failed to get medicine details from Gemini fallback:', err.message);
+    return null;
+  }
+}
+
+
 
 /**
  * Decode uploaded Prescription image or raw text
@@ -163,17 +192,60 @@ async function decodePrescription(req, res) {
               genericName: fdaMed.genericName !== 'Unknown' ? fdaMed.genericName : med.genericName
             });
           } else {
+            // If not in openFDA, query Gemini as fallback to get correct details
+            try {
+              console.log(`[Gemini Fallback] Querying details for: ${med.name}`);
+              const geminiDetails = await getMedicineDetailsFromGemini(med.name);
+              if (geminiDetails) {
+                richMedicines.push({
+                  ...med,
+                  dbMatched: true, // Mark as matched since we successfully resolved it via Gemini
+                  safetyCategory: geminiDetails.safetyCategory || 'Caution',
+                  sideEffects: Array.from(new Set([...med.sideEffects, ...(geminiDetails.sideEffects || [])])),
+                  interactions: Array.from(new Set([...med.interactions, ...(geminiDetails.interactions || [])])),
+                  genericName: geminiDetails.genericName || med.genericName
+                });
+              } else {
+                richMedicines.push({
+                  ...med,
+                  dbMatched: false
+                });
+              }
+            } catch (geminiErr) {
+              console.error('[Gemini Fallback Exception]', geminiErr.message);
+              richMedicines.push({
+                ...med,
+                dbMatched: false
+              });
+            }
+          }
+        } catch (fdaErr) {
+          console.error('[openFDA Query Exception]', fdaErr.message);
+          // Try Gemini fallback in case openFDA request failed
+          try {
+            console.log(`[Gemini Fallback after openFDA failure] Querying details for: ${med.name}`);
+            const geminiDetails = await getMedicineDetailsFromGemini(med.name);
+            if (geminiDetails) {
+              richMedicines.push({
+                ...med,
+                dbMatched: true,
+                safetyCategory: geminiDetails.safetyCategory || 'Caution',
+                sideEffects: Array.from(new Set([...med.sideEffects, ...(geminiDetails.sideEffects || [])])),
+                interactions: Array.from(new Set([...med.interactions, ...(geminiDetails.interactions || [])])),
+                genericName: geminiDetails.genericName || med.genericName
+              });
+            } else {
+              richMedicines.push({
+                ...med,
+                dbMatched: false
+              });
+            }
+          } catch (geminiErr) {
             richMedicines.push({
               ...med,
               dbMatched: false
             });
           }
-        } catch (fdaErr) {
-          console.error('[openFDA Query Exception]', fdaErr.message);
-          richMedicines.push({
-            ...med,
-            dbMatched: false
-          });
         }
       }
     }

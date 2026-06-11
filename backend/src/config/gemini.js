@@ -1805,6 +1805,17 @@ async function simulateAiOutput(prompt, systemInstruction, modelName) {
     });
   }
 
+  // Scenario 4: Single Medicine Details Fallback
+  if (sysLower.includes('clinical pharmacology model') || sysLower.includes('medicine name')) {
+    return JSON.stringify({
+      genericName: `${prompt} Generic`,
+      description: `Simulated description for ${prompt}. Commonly used to treat related symptoms.`,
+      safetyCategory: "Caution",
+      sideEffects: [`Side effect 1 for ${prompt}`, `Side effect 2 for ${prompt}`],
+      interactions: [`Interaction with alcohol`, `Do not take with blood thinners`]
+    });
+  }
+
   // Fallback default response
   return JSON.stringify({
     text: `[Simulated ${modelName}] Prescrypto Response to: "${prompt.substring(0, 50)}..."`,
