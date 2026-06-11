@@ -1,5 +1,7 @@
 const Tesseract = require('tesseract.js');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 /**
  * Perform OCR using Tesseract.js, falling back to Google Vision simulation if text extraction is poor.
@@ -7,26 +9,30 @@ const fs = require('fs');
 async function performOcr(filePath, type = 'prescription') {
   console.log(`[OCR] Parsing file: ${filePath}, type hint: ${type}`);
   
-  // Direct fallback on Vercel or in production to avoid serverless timeouts/errors
-  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-    console.log('[OCR] Running on Vercel/Production — using fast Google Vision API fallback directly.');
-    return await performGoogleVisionFallback(filePath, type);
-  }
-  
   try {
     // 1. Check if file exists
     if (!fs.existsSync(filePath)) {
       throw new Error(`File does not exist: ${filePath}`);
     }
 
-    // 2. Run Tesseract.js recognition
-    const result = await Tesseract.recognize(
+    const cachePath = os.tmpdir();
+    console.log(`[OCR] Tesseract cache path configured to: ${cachePath}`);
+
+    // 2. Run Tesseract.js recognition with a 7.5-second timeout to prevent serverless gateway timeouts
+    const tesseractPromise = Tesseract.recognize(
       filePath,
       'eng',
       { 
+        cachePath: cachePath,
         logger: m => console.log(`[Tesseract logger]`, m.status, `${Math.round(m.progress * 100)}%`) 
       }
     );
+
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Tesseract OCR execution timed out')), 7500)
+    );
+
+    const result = await Promise.race([tesseractPromise, timeoutPromise]);
 
     const extractedText = result.data.text ? result.data.text.trim() : '';
     const confidence = result.data.confidence || 0.0;
@@ -46,7 +52,7 @@ async function performOcr(filePath, type = 'prescription') {
     };
 
   } catch (error) {
-    console.error('[OCR Error] Tesseract process failed, falling back to Google Vision...', error);
+    console.error('[OCR Error] Tesseract process failed, falling back to Google Vision...', error.message);
     return await performGoogleVisionFallback(filePath, type);
   }
 }
