@@ -24,15 +24,15 @@
     },
     {
       "src": "/assets/(.*)",
-      "dest": "frontend/dist/assets/$1"
+      "dest": "frontend/assets/$1"
     },
     {
       "src": "/background.png",
-      "dest": "frontend/dist/background.png"
+      "dest": "frontend/background.png"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/dist/index.html"
+      "dest": "frontend/index.html"
     }
   ]
 }
