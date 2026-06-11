@@ -73,6 +73,475 @@ async function main() {
           severity: 'Moderate'
         }
       ]
+    },
+    {
+      name: 'Ibuprofen',
+      genericName: 'Ibuprofen',
+      composition: '(RS)-2-(4-(2-methylpropyl)phenyl)propanoic acid',
+      manufacturer: 'Pfizer / Generic',
+      description: 'Nonsteroidal anti-inflammatory drug (NSAID) used for treating pain, fever, and inflammation.',
+      safetyCategory: 'Caution (NSAID / GI Bleed Risk)',
+      dosageForms: ['tablet', 'capsule', 'suspension'],
+      sideEffects: [
+        { description: 'Stomach pain, heartburn, nausea', severity: 'Common' },
+        { description: 'Gastrointestinal bleeding, kidney damage', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Aspirin',
+          description: 'Concomitant use may increase risk of gastrointestinal ulcers and bleeding.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Sertraline',
+          description: 'Concomitant use increases the risk of upper gastrointestinal bleeding due to combined platelet inhibition.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Prednisone',
+          description: 'Co-administration increases the risk of gastrointestinal ulcers, bleeding, and irritation.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Clopidogrel',
+          description: 'Concomitant use increases the risk of upper gastrointestinal bleeding.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Aspirin',
+      genericName: 'Acetylsalicylic Acid',
+      composition: '2-acetoxybenzoic acid',
+      manufacturer: 'Bayer / Generic',
+      description: 'Medication used to reduce pain, fever, or inflammation, and as a blood thinner to prevent cardiovascular events.',
+      safetyCategory: 'Caution (Bleeding Risk / Reye Syndrome)',
+      dosageForms: ['tablet', 'chewable tablet'],
+      sideEffects: [
+        { description: 'Stomach upset, mild heartburn', severity: 'Common' },
+        { description: 'Gastrointestinal bleeding, tinnitus', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Ibuprofen',
+          description: 'Ibuprofen may decrease the cardioprotective effect of low-dose Aspirin. Space doses appropriately.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Sertraline',
+          description: 'Concomitant use increases the risk of upper gastrointestinal bleeding due to combined platelet inhibition.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Prednisone',
+          description: 'Increases the risk of gastrointestinal ulcers and decreases systemic salicylate levels.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Clopidogrel',
+          description: 'Synergistic bleeding risk. Frequently used together (DAPT) under strict medical supervision only.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Lisinopril',
+      genericName: 'Lisinopril',
+      composition: 'ACE inhibitor',
+      manufacturer: 'Merck / Generic',
+      description: 'ACE inhibitor medication used to treat high blood pressure, heart failure, and post-myocardial infarction.',
+      safetyCategory: 'Caution (Pregnancy Class D)',
+      dosageForms: ['tablet'],
+      sideEffects: [
+        { description: 'Dry cough, dizziness, headache', severity: 'Common' },
+        { description: 'Angioedema (swelling of face/throat), hyperkalemia', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Losartan',
+          description: 'Combined use increases risk of hyperkalemia, severe hypotension, and kidney dysfunction.',
+          severity: 'High'
+        },
+        {
+          medicineName: 'Spironolactone',
+          description: 'High risk of severe, life-threatening hyperkalemia when combined. Require frequent potassium checks.',
+          severity: 'High'
+        }
+      ]
+    },
+    {
+      name: 'Amlodipine',
+      genericName: 'Amlodipine Besylate',
+      composition: 'Dihydropyridine calcium channel blocker',
+      manufacturer: 'Pfizer / Generic',
+      description: 'Calcium channel blocker medication used to treat high blood pressure and chest pain (angina).',
+      safetyCategory: 'Safe (Follow Dosage)',
+      dosageForms: ['tablet'],
+      sideEffects: [
+        { description: 'Ankle swelling (edema), dizziness, flushing', severity: 'Common' },
+        { description: 'Severe chest pain (rare)', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Simvastatin',
+          description: 'Amlodipine increases Simvastatin levels, raising the risk of muscle damage (myopathy). Limit Simvastatin to 20mg daily.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Metoprolol',
+          description: 'Combined use can cause additive blood pressure lowering and extreme bradycardia. Monitor vital signs.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Omeprazole',
+      genericName: 'Omeprazole',
+      composition: 'Proton pump inhibitor (PPI)',
+      manufacturer: 'AstraZeneca / Generic',
+      description: 'Proton pump inhibitor used to treat GERD, peptic ulcer disease, and H. pylori infections.',
+      safetyCategory: 'Safe (Short-Term Use)',
+      dosageForms: ['capsule', 'tablet', 'suspension'],
+      sideEffects: [
+        { description: 'Headache, abdominal pain, diarrhea', severity: 'Common' },
+        { description: 'Clostridium difficile-associated diarrhea, kidney disease', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Levothyroxine',
+          description: 'Omeprazole reduces gastric acid, which can decrease Levothyroxine absorption. Space doses by at least 4 hours.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Clopidogrel',
+          description: 'Omeprazole inhibits CYP2C19, reducing Clopidogrel activation and antiplatelet efficacy. Avoid combined use.',
+          severity: 'High'
+        }
+      ]
+    },
+    {
+      name: 'Azithromycin',
+      genericName: 'Azithromycin Dihydrate',
+      composition: 'Macrolide antibiotic',
+      manufacturer: 'Pfizer / Generic',
+      description: 'Broad-spectrum macrolide antibiotic used for respiratory, skin, and ear infections.',
+      safetyCategory: 'Caution (QT Prolongation)',
+      dosageForms: ['tablet', 'suspension', 'injection'],
+      sideEffects: [
+        { description: 'Diarrhea, nausea, abdominal pain', severity: 'Common' },
+        { description: 'Hepatotoxicity, QT interval prolongation (heart rhythm issue)', severity: 'Severe' }
+      ],
+      interactions: []
+    },
+    {
+      name: 'Losartan',
+      genericName: 'Losartan Potassium',
+      composition: 'Angiotensin II receptor antagonist',
+      manufacturer: 'Merck / Generic',
+      description: 'Angiotensin II receptor antagonist used to treat high blood pressure and protect kidneys from diabetic damage.',
+      safetyCategory: 'Caution (Pregnancy Class D)',
+      dosageForms: ['tablet'],
+      sideEffects: [
+        { description: 'Dizziness, fatigue, nasal congestion', severity: 'Common' },
+        { description: 'Hyperkalemia, renal impairment', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Lisinopril',
+          description: 'Combined use increases risk of hyperkalemia, severe hypotension, and kidney dysfunction.',
+          severity: 'High'
+        },
+        {
+          medicineName: 'Spironolactone',
+          description: 'Concomitant use increases the risk of life-threatening hyperkalemia (high blood potassium).',
+          severity: 'High'
+        }
+      ]
+    },
+    {
+      name: 'Gabapentin',
+      genericName: 'Gabapentin',
+      composition: 'Gamma-aminobutyric acid analog',
+      manufacturer: 'Pfizer / Generic',
+      description: 'Anticonvulsant and neuropathic pain medication used for seizures and postherpetic neuralgia.',
+      safetyCategory: 'Caution (CNS Depressant / Kidney Impairment)',
+      dosageForms: ['capsule', 'tablet', 'solution'],
+      sideEffects: [
+        { description: 'Dizziness, drowsiness, coordination issues, fatigue', severity: 'Common' },
+        { description: 'Suicidal thoughts, severe respiratory depression', severity: 'Severe' }
+      ],
+      interactions: []
+    },
+    {
+      name: 'Albuterol',
+      genericName: 'Albuterol Sulfate',
+      composition: 'Beta-2 adrenergic receptor agonist',
+      manufacturer: 'GSK / Generic',
+      description: 'Short-acting bronchodilator used to prevent and treat bronchospasm in asthma and COPD.',
+      safetyCategory: 'Safe (Use as Directed)',
+      dosageForms: ['inhaler', 'nebulizer solution', 'tablet'],
+      sideEffects: [
+        { description: 'Tremors, nervousness, headache, rapid heart rate', severity: 'Common' },
+        { description: 'Paradoxical bronchospasm, cardiac arrhythmia', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Metoprolol',
+          description: 'Beta-blockers can block the effect of Albuterol and trigger severe bronchospasms in patients with asthma or COPD.',
+          severity: 'High'
+        }
+      ]
+    },
+    {
+      name: 'Levothyroxine',
+      genericName: 'Levothyroxine Sodium',
+      composition: 'Synthetic thyroid hormone T4',
+      manufacturer: 'AbbVie / Generic',
+      description: 'Synthetic thyroid hormone used to treat hypothyroidism and suppress thyroid cancer growth.',
+      safetyCategory: 'Safe (Dose Titration Required)',
+      dosageForms: ['tablet', 'injection'],
+      sideEffects: [
+        { description: 'Hair loss in starting phase, changes in appetite', severity: 'Common' },
+        { description: 'Chest pain, rapid or irregular heartbeat, osteoporosis (long-term)', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Omeprazole',
+          description: 'Omeprazole reduces gastric acid, which can decrease Levothyroxine absorption. Space doses by at least 4 hours.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Pantoprazole',
+          description: 'Proton pump inhibitors reduce stomach acid, impairing Levothyroxine absorption. Space doses by at least 4 hours.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Sertraline',
+      genericName: 'Sertraline Hydrochloride',
+      composition: 'Selective serotonin reuptake inhibitor (SSRI)',
+      manufacturer: 'Pfizer / Generic',
+      description: 'Antidepressant used to treat depression, panic disorder, obsessive-compulsive disorder, and anxiety.',
+      safetyCategory: 'Caution (Suicidal Ideation Risk / Serotonin Syndrome)',
+      dosageForms: ['tablet', 'oral solution'],
+      sideEffects: [
+        { description: 'Nausea, diarrhea, insomnia, sexual dysfunction, dry mouth', severity: 'Common' },
+        { description: 'Serotonin syndrome, suicidal behavior, bleeding risk', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Aspirin',
+          description: 'Concomitant use increases the risk of upper gastrointestinal bleeding due to combined platelet inhibition.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Ibuprofen',
+          description: 'Combined use increases risk of gastrointestinal bleeding and bruising.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Simvastatin',
+      genericName: 'Simvastatin',
+      composition: 'HMG-CoA reductase inhibitor (statin)',
+      manufacturer: 'Merck / Generic',
+      description: 'Statin medication used to lower cholesterol and triglycerides, reducing cardiovascular risk.',
+      safetyCategory: 'Caution (Pregnancy Class X / Myopathy Risk)',
+      dosageForms: ['tablet', 'suspension'],
+      sideEffects: [
+        { description: 'Headache, muscle aches, upper respiratory tract infection', severity: 'Common' },
+        { description: 'Myopathy, rhabdomyolysis (muscle breakdown), liver damage', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Amlodipine',
+          description: 'Amlodipine increases Simvastatin levels, raising the risk of muscle damage (myopathy). Limit Simvastatin to 20mg daily.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Pantoprazole',
+      genericName: 'Pantoprazole Sodium',
+      composition: 'Proton pump inhibitor (PPI)',
+      manufacturer: 'Takeda / Generic',
+      description: 'Proton pump inhibitor used to treat GERD, erosive esophagitis, and hypersecretory conditions.',
+      safetyCategory: 'Safe (Short-Term Use)',
+      dosageForms: ['tablet', 'injection'],
+      sideEffects: [
+        { description: 'Headache, diarrhea, flatulence, joint pain', severity: 'Common' },
+        { description: 'Kidney nephritis, osteoporosis fractures, B12 deficiency (long-term)', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Levothyroxine',
+          description: 'PPIs like Pantoprazole can decrease the absorption of thyroid hormone by raising stomach pH.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Metoprolol',
+      genericName: 'Metoprolol Succinate',
+      composition: 'Selective beta-1 adrenergic blocker',
+      manufacturer: 'AstraZeneca / Generic',
+      description: 'Beta-blocker used for high blood pressure, angina, heart failure, and post-myocardial infarction.',
+      safetyCategory: 'Caution (Do Not Abruptly Discontinue)',
+      dosageForms: ['tablet', 'extended-release tablet', 'injection'],
+      sideEffects: [
+        { description: 'Fatigue, dizziness, slow heart rate, cold extremities', severity: 'Common' },
+        { description: 'Severe bradycardia, heart block, bronchospasm, clinical depression', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Albuterol',
+          description: 'Beta-blockers antagonize the effects of beta-agonists like Albuterol and may precipitate bronchospasms.',
+          severity: 'High'
+        },
+        {
+          medicineName: 'Amlodipine',
+          description: 'Combined use can cause additive blood pressure lowering and extreme bradycardia. Monitor vital signs.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Prednisone',
+      genericName: 'Prednisone',
+      composition: 'Synthetic glucocorticoid corticosteroid',
+      manufacturer: 'Generic',
+      description: 'Corticosteroid anti-inflammatory drug used for immune suppression, allergies, and inflammatory conditions.',
+      safetyCategory: 'Caution (Immunosuppression / Taper Required)',
+      dosageForms: ['tablet', 'solution'],
+      sideEffects: [
+        { description: 'Increased appetite, weight gain, insomnia, high blood sugar, mood changes', severity: 'Common' },
+        { description: 'Adrenal insufficiency, osteoporosis, severe infections, Cushingoid features', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Ibuprofen',
+          description: 'Co-administration increases the risk of gastrointestinal ulcers, bleeding, and irritation.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Aspirin',
+          description: 'Increases the risk of gastrointestinal ulcers and decreases systemic salicylate levels.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Montelukast',
+      genericName: 'Montelukast Sodium',
+      composition: 'Leukotriene receptor antagonist',
+      manufacturer: 'Organon / Generic',
+      description: 'Leukotriene receptor antagonist used for chronic asthma management and seasonal allergy relief.',
+      safetyCategory: 'Caution (Neuropsychiatric Event Warning)',
+      dosageForms: ['tablet', 'chewable tablet', 'granules'],
+      sideEffects: [
+        { description: 'Headache, abdominal pain, cough, mild fever', severity: 'Common' },
+        { description: 'Neuropsychiatric reactions (hallucinations, depression, aggression, suicidal thoughts)', severity: 'Severe' }
+      ],
+      interactions: []
+    },
+    {
+      name: 'Ciprofloxacin',
+      genericName: 'Ciprofloxacin Hydrochloride',
+      composition: 'Fluoroquinolone antibiotic',
+      manufacturer: 'Bayer / Generic',
+      description: 'Broad-spectrum antibiotic used to treat bone, joint, urinary, and respiratory infections.',
+      safetyCategory: 'Caution (Tendon Rupture / Aortic Aneurysm Risk)',
+      dosageForms: ['tablet', 'suspension', 'ophthalmic solution'],
+      sideEffects: [
+        { description: 'Nausea, diarrhea, stomach upset, headache', severity: 'Common' },
+        { description: 'Tendonitis, tendon rupture, peripheral neuropathy, QT prolongation', severity: 'Severe' }
+      ],
+      interactions: []
+    },
+    {
+      name: 'Clopidogrel',
+      genericName: 'Clopidogrel Bisulfate',
+      composition: 'P2Y12 platelet inhibitor',
+      manufacturer: 'Bristol Myers Squibb / Generic',
+      description: 'Antiplatelet blood thinner used to prevent heart attacks and strokes in high-risk patients.',
+      safetyCategory: 'Caution (Bleeding Risk)',
+      dosageForms: ['tablet'],
+      sideEffects: [
+        { description: 'Bleeding, bruising, nosebleeds, skin itching', severity: 'Common' },
+        { description: 'Severe internal bleeding, thrombotic thrombocytopenic purpura (TTP)', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Omeprazole',
+          description: 'Omeprazole inhibits CYP2C19, reducing Clopidogrel activation and antiplatelet efficacy. Avoid combined use.',
+          severity: 'High'
+        },
+        {
+          medicineName: 'Aspirin',
+          description: 'Synergistic bleeding risk. Frequently used together (DAPT) under strict medical supervision only.',
+          severity: 'Moderate'
+        },
+        {
+          medicineName: 'Ibuprofen',
+          description: 'Concomitant use increases the risk of upper gastrointestinal bleeding.',
+          severity: 'Moderate'
+        }
+      ]
+    },
+    {
+      name: 'Cetirizine',
+      genericName: 'Cetirizine Hydrochloride',
+      composition: 'Second-generation antihistamine',
+      manufacturer: 'Johnson & Johnson / Generic',
+      description: 'Antihistamine used to treat hay fever, seasonal allergies, hives, and hives-related itching.',
+      safetyCategory: 'Safe (May Cause Mild Drowsiness)',
+      dosageForms: ['tablet', 'chewable tablet', 'syrup'],
+      sideEffects: [
+        { description: 'Drowsiness, dry mouth, fatigue, sore throat', severity: 'Common' },
+        { description: 'Severe allergic reaction, bronchospasm (extreme rare)', severity: 'Severe' }
+      ],
+      interactions: []
+    },
+    {
+      name: 'Famotidine',
+      genericName: 'Famotidine',
+      composition: 'Histamine H2 receptor antagonist',
+      manufacturer: 'Johnson & Johnson / Generic',
+      description: 'H2 acid reducer used to treat and prevent heartburn, acid indigestion, and peptic ulcers.',
+      safetyCategory: 'Safe (Follow Package Instructions)',
+      dosageForms: ['tablet', 'suspension', 'injection'],
+      sideEffects: [
+        { description: 'Headache, dizziness, constipation, diarrhea', severity: 'Common' },
+        { description: 'Cardiac arrhythmia, severe hypersensitivity reaction', severity: 'Severe' }
+      ],
+      interactions: []
+    },
+    {
+      name: 'Spironolactone',
+      genericName: 'Spironolactone',
+      composition: 'Aldosterone receptor antagonist',
+      manufacturer: 'Pfizer / Generic',
+      description: 'Potassium-sparing diuretic used for heart failure, liver ascites, high blood pressure, and hypokalemia.',
+      safetyCategory: 'Caution (Hyperkalemia Risk)',
+      dosageForms: ['tablet', 'suspension'],
+      sideEffects: [
+        { description: 'Gynecomastia, irregular menstrual cycles, nausea, dizziness', severity: 'Common' },
+        { description: 'Severe hyperkalemia (high potassium), acute renal dysfunction', severity: 'Severe' }
+      ],
+      interactions: [
+        {
+          medicineName: 'Lisinopril',
+          description: 'High risk of severe, life-threatening hyperkalemia when combined. Require frequent potassium checks.',
+          severity: 'High'
+        },
+        {
+          medicineName: 'Losartan',
+          description: 'Combined use increases risk of severe hyperkalemia and renal failure. Monitor potassium levels.',
+          severity: 'High'
+        }
+      ]
     }
   ];
 
