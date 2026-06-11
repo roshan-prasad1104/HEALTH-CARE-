@@ -105,7 +105,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
   return (
     <>
-      <nav className="glass-panel navbar-bg border-b sticky top-0 z-50 px-4 md:px-8 py-3 flex flex-wrap items-center justify-between gap-4"
+    <nav className="glass-panel navbar-bg border-b sticky top-0 z-50 px-4 md:px-8 py-2 md:py-3 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4"
       style={{ borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}
     >
       {/* Brand Logo */}
@@ -130,7 +130,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
       {/* Tabs */}
       <div
-        className="flex items-center gap-1 p-1 rounded-xl border overflow-x-auto max-w-full"
+        className="flex items-center gap-1 p-1 rounded-xl border overflow-x-auto max-w-full w-full md:w-auto"
         style={{
           background: darkMode ? 'rgba(3,7,18,0.6)' : 'rgba(241,245,249,0.8)',
           borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)',
@@ -158,7 +158,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap w-full md:w-auto justify-between md:justify-start">
         {/* Large Text Toggle */}
         <button
           onClick={() => dispatch(toggleLargeFont())}
@@ -182,7 +182,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
             const text = !elderlyMode ? t('speech.elderlyEnabled') : t('speech.elderlyDisabled');
             speakText(text, i18n.language);
           }}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5"
+          className="p-2 sm:px-3 sm:py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5"
           style={elderlyMode ? {
             borderColor: '#10b981', background: 'rgba(16,185,129,0.1)', color: '#34d399'
           } : {
@@ -192,7 +192,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           }}
         >
           <Eye className="w-3.5 h-3.5" />
-          <span>{t('accessibility.elderly')}</span>
+          <span className="hidden sm:inline">{t('accessibility.elderly')}</span>
         </button>
 
         {/* TTS Narrator */}
@@ -234,7 +234,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
         {/* ─── User Profile Dropdown ─── */}
         {user && (
-          <div className="relative" ref={dropdownRef}>
+          <div className="absolute top-2.5 right-4 md:relative md:top-auto md:right-auto md:translate-y-0" ref={dropdownRef}>
             {/* Avatar trigger button */}
             <button
               id="user-profile-btn"
