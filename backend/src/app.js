@@ -21,6 +21,23 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Lazy database connection initialization for serverless / Vercel environment
+app.use(async (req, res, next) => {
+  if (global.dbActive === undefined) {
+    const prisma = require('./config/db');
+    try {
+      console.log('[DB] Checking Prisma connection lazily...');
+      await prisma.$connect();
+      global.dbActive = true;
+      console.log('[DB] Database connection established lazily.');
+    } catch (error) {
+      global.dbActive = false;
+      console.error('[DB Warn] Database connection could not be established lazily. Falling back to mocks.', error.message);
+    }
+  }
+  next();
+});
+
 // Serve static uploads folder (if needed for persistent links)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

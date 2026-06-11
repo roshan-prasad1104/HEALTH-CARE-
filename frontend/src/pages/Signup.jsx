@@ -64,7 +64,7 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -77,7 +77,7 @@ export default function Signup() {
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Server error — ensure backend is running on port 5000');
+        throw new Error('Server error — ensure backend is running');
       }
 
       const data = await response.json();
