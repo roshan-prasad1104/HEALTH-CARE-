@@ -46,6 +46,26 @@ import { useSelector } from 'react-redux';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { FileText, AlertTriangle, ShieldCheck, RefreshCw, BarChart3, TrendingUp, Info, Volume2, VolumeX } from 'lucide-react';
 
+const parseRangeString = (normalRangeStr) => {
+  if (!normalRangeStr) return { min: 0, max: 100 };
+  const cleaned = normalRangeStr.replace(/[^\d\.\-]/g, '');
+  const parts = cleaned.split('-');
+  if (parts.length === 2) {
+    const min = parseFloat(parts[0]);
+    const max = parseFloat(parts[1]);
+    if (!isNaN(min) && !isNaN(max)) {
+      return { min, max };
+    }
+  }
+  const matches = normalRangeStr.match(/(\d+(\.\d+)?)/g);
+  if (matches && matches.length >= 2) {
+    const min = parseFloat(matches[0]);
+    const max = parseFloat(matches[1]);
+    return { min, max };
+  }
+  return { min: 0, max: 100 };
+};
+
 export default function LabAnalyzer() {
   const { t, i18n } = useTranslation();
   const { largeFont, darkMode } = useSelector(state => state.settings);
@@ -363,6 +383,124 @@ export default function LabAnalyzer() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Range Visualizer Graph */}
+                  {(() => {
+                    const { min, max } = parseRangeString(marker.normalRange);
+                    const val = parseFloat(marker.value);
+                    if (isNaN(val)) return null;
+
+                    const span = max - min || 1;
+                    const startValue = Math.max(0, min - span * 0.8);
+                    const endValue = max + span * 0.8;
+                    const totalRange = endValue - startValue;
+                    
+                    let percentage = totalRange > 0 ? ((val - startValue) / totalRange) * 100 : 50;
+                    percentage = Math.max(0, Math.min(100, percentage));
+
+                    const normalStartPct = totalRange > 0 ? ((min - startValue) / totalRange) * 100 : 30;
+                    const normalEndPct = totalRange > 0 ? ((max - startValue) / totalRange) * 100 : 70;
+
+                    const isLow = val < min;
+                    const isHigh = val > max;
+                    
+                    let pointerColor = 'bg-emerald-500';
+                    let textThemeColor = '#10b981';
+                    if (isLow) {
+                      pointerColor = 'bg-sky-500';
+                      textThemeColor = '#0ea5e9';
+                    } else if (isHigh) {
+                      pointerColor = 'bg-rose-500';
+                      textThemeColor = '#f43f5e';
+                    }
+
+                    return (
+                      <div className="my-4 px-1">
+                        {/* Labels above bar */}
+                        <div className="flex justify-between text-[10px] font-bold mb-1.5" style={{ color: 'var(--text-faint)' }}>
+                          <span>Low ({startValue.toFixed(1)})</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>Normal Range ({min.toFixed(1)} - {max.toFixed(1)})</span>
+                          <span>High ({endValue.toFixed(1)})</span>
+                        </div>
+
+                        {/* Visual bar container */}
+                        <div 
+                          className="h-3 w-full rounded-full relative overflow-hidden shadow-inner border"
+                          style={{
+                            backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.6)' : 'rgba(241, 245, 249, 0.9)',
+                            borderColor: 'var(--border-default)'
+                          }}
+                        >
+                          {/* Low Zone (0% to normalStartPct) */}
+                          <div 
+                            className="absolute top-0 left-0 bottom-0 border-r border-dashed"
+                            style={{ 
+                              width: `${normalStartPct}%`,
+                              backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                              borderColor: 'rgba(14, 165, 233, 0.2)'
+                            }}
+                          ></div>
+                          
+                          {/* Normal Zone (normalStartPct to normalEndPct) */}
+                          <div 
+                            className="absolute top-0 bottom-0 border-r border-dashed"
+                            style={{ 
+                              left: `${normalStartPct}%`, 
+                              width: `${normalEndPct - normalStartPct}%`,
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              borderColor: 'rgba(16, 185, 129, 0.2)'
+                            }}
+                          ></div>
+                          
+                          {/* High Zone (normalEndPct to 100%) */}
+                          <div 
+                            className="absolute top-0 right-0 bottom-0"
+                            style={{ 
+                              left: `${normalEndPct}%`,
+                              backgroundColor: 'rgba(244, 63, 94, 0.1)'
+                            }}
+                          ></div>
+
+                          {/* Reference ticks */}
+                          <div 
+                            className="absolute top-0 bottom-0 border-l border-dashed border-slate-500/20 text-[7px] font-black pl-1 pt-px"
+                            style={{ left: `${normalStartPct}%`, color: 'var(--text-faint)' }}
+                          >
+                            MIN
+                          </div>
+                          <div 
+                            className="absolute top-0 bottom-0 border-l border-dashed border-slate-500/20 text-[7px] font-black pl-1 pt-px"
+                            style={{ left: `${normalEndPct}%`, color: 'var(--text-faint)' }}
+                          >
+                            MAX
+                          </div>
+
+                          {/* User value indicator pointer */}
+                          <div 
+                            className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white ${pointerColor} shadow-lg flex items-center justify-center transition-all duration-700 z-10 cursor-help`}
+                            style={{ left: `calc(${percentage}% - 8px)` }}
+                            title={`Your Value: ${val} ${marker.unit || ''}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                          </div>
+                        </div>
+
+                        {/* Pointer label underneath */}
+                        <div className="relative h-4 mt-1 text-[10px] font-bold">
+                          <div 
+                            className="absolute transition-all duration-700 text-center whitespace-nowrap"
+                            style={{ 
+                              left: `${percentage}%`, 
+                              transform: 'translateX(-50%)',
+                              color: textThemeColor
+                            }}
+                          >
+                            Your Value ({val} {marker.unit || ''})
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1 text-[11px]">
                     <div className="p-2.5 rounded-lg border sub-card">
