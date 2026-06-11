@@ -4,6 +4,76 @@ const { performOcr } = require('../ocr/ocrService');
 const { decodePrescriptionText, analyzeLabReportText } = require('../ai/aiService');
 const { generateAIResponse } = require('../../config/gemini');
 const prisma = require('../../config/db');
+const https = require('https');
+
+/**
+ * Query openFDA drug label API for additional information
+ */
+async function queryOpenFda(medicineName) {
+  const apiKey = process.env.FDA_API_KEY || '';
+  const searchUrl = `https://api.fda.gov/drug/label.json?api_key=${apiKey}&search=openfda.brand_name:"${encodeURIComponent(medicineName)}"+OR+openfda.generic_name:"${encodeURIComponent(medicineName)}"&limit=1`;
+  
+  return new Promise((resolve) => {
+    https.get(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      }
+    }, (res) => {
+      if (res.statusCode !== 200) {
+        return resolve(null);
+      }
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          const result = parsed.results?.[0];
+          if (!result) return resolve(null);
+          
+          const extractText = (field) => {
+            if (!field) return '';
+            const raw = Array.isArray(field) ? field.join(' ') : String(field);
+            const clean = raw.replace(/<\/?[^>]+(>|$)/g, "").trim();
+            if (clean.length > 200) {
+              return clean.substring(0, 197) + '...';
+            }
+            return clean;
+          };
+
+          const extractList = (field) => {
+            if (!field) return [];
+            const raw = Array.isArray(field) ? field.join(' ') : String(field);
+            const clean = raw.replace(/<\/?[^>]+(>|$)/g, "").trim();
+            const items = clean.split(/[;•\n\-\u2022]/)
+              .map(x => x.trim())
+              .filter(x => x.length > 10 && x.length < 150)
+              .slice(0, 4);
+            if (items.length === 0 && clean.length > 0) {
+              return [clean.length > 100 ? clean.substring(0, 97) + '...' : clean];
+            }
+            return items;
+          };
+
+          resolve({
+            brandName: result.openfda?.brand_name?.[0] || medicineName,
+            genericName: result.openfda?.generic_name?.[0] || 'Unknown',
+            description: extractText(result.indications_and_usage || result.description),
+            safetyCategory: result.pregnancy ? extractText(result.pregnancy) : 'Caution',
+            sideEffects: extractList(result.adverse_reactions || result.warnings_and_cautions),
+            interactions: extractList(result.drug_interactions)
+          });
+        } catch (e) {
+          console.error('[openFDA Parse Error]', e.message);
+          resolve(null);
+        }
+      });
+    }).on('error', (err) => {
+      console.error('[openFDA HTTP Error]', err.message);
+      resolve(null);
+    });
+  });
+}
+
 
 /**
  * Decode uploaded Prescription image or raw text
@@ -79,10 +149,32 @@ async function decodePrescription(req, res) {
           interactions: Array.from(new Set([...med.interactions, ...dbInteractions]))
         });
       } else {
-        richMedicines.push({
-          ...med,
-          dbMatched: false
-        });
+        // Fallback to openFDA if not present in our seeded DB
+        try {
+          console.log(`[openFDA Check] Querying details for: ${med.name}`);
+          const fdaMed = await queryOpenFda(med.name);
+          if (fdaMed) {
+            richMedicines.push({
+              ...med,
+              dbMatched: true,
+              safetyCategory: fdaMed.safetyCategory || 'Caution',
+              sideEffects: Array.from(new Set([...med.sideEffects, ...fdaMed.sideEffects])),
+              interactions: Array.from(new Set([...med.interactions, ...fdaMed.interactions])),
+              genericName: fdaMed.genericName !== 'Unknown' ? fdaMed.genericName : med.genericName
+            });
+          } else {
+            richMedicines.push({
+              ...med,
+              dbMatched: false
+            });
+          }
+        } catch (fdaErr) {
+          console.error('[openFDA Query Exception]', fdaErr.message);
+          richMedicines.push({
+            ...med,
+            dbMatched: false
+          });
+        }
       }
     }
 
@@ -150,7 +242,7 @@ async function analyzeLabReport(req, res) {
   }
 }
 
-const https = require('https');
+
 
 function translateTextFree(text, targetLangCode) {
   return new Promise((resolve, reject) => {
