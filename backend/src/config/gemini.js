@@ -464,7 +464,7 @@ async function simulateAiOutput(prompt, systemInstruction, modelName) {
 
 
   // Scenario 2: Prescription Decoder
-  if (systemInstruction.includes('prescription') || promptLower.includes('mg') || promptLower.includes('tablet') || promptLower.includes('paracetamol')) {
+  if (sysLower.includes('prescription') || sysLower.includes('decoder') || (!sysLower.includes('lab') && (promptLower.includes('mg') || promptLower.includes('tablet') || promptLower.includes('paracetamol')))) {
     const baseMocks = {
       paracetamol: {
         name: "Paracetamol 650mg",
@@ -1787,7 +1787,7 @@ async function simulateAiOutput(prompt, systemInstruction, modelName) {
   }
 
   // Scenario 3: Lab Report Analyzer
-  if (systemInstruction.includes('lab') || promptLower.includes('hba1c') || promptLower.includes('cholesterol') || promptLower.includes('mg/dl')) {
+  if (sysLower.includes('lab') || sysLower.includes('analyzer') || promptLower.includes('hba1c') || promptLower.includes('cholesterol') || promptLower.includes('mg/dl')) {
     return JSON.stringify({
       markers: [
         {
