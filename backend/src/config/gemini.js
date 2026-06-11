@@ -1788,21 +1788,200 @@ async function simulateAiOutput(prompt, systemInstruction, modelName) {
 
   // Scenario 3: Lab Report Analyzer
   if (sysLower.includes('lab') || sysLower.includes('analyzer') || promptLower.includes('hba1c') || promptLower.includes('cholesterol') || promptLower.includes('mg/dl')) {
-    return JSON.stringify({
-      markers: [
+    const parseMockLabReport = (inputText) => {
+      const textLower = inputText.toLowerCase();
+      const markers = [];
+
+      const markerDefinitions = [
         {
-          name: "HbA1c",
-          value: 7.2,
-          unit: "%",
-          status: "Elevated (Diabetes Range)",
-          normalRange: "4.0% - 5.6%",
-          explanation: "Your HbA1c value is 7.2%, which is above the normal threshold. This indicates that your average blood sugar levels over the last 90 days are in the diabetes range (>=6.5%).",
-          educationalRecommendation: "This suggests active diabetes. Engage with your doctor to review your metabolic care, exercise routine, and medication. Avoid high-sugar foods."
+          names: ['hba1c', 'a1c', 'hb a1c'],
+          key: 'HbA1c',
+          unit: '%',
+          normalRange: '4.0% - 5.6%',
+          ranges: { low: [0, 4.0], normal: [4.0, 5.7], elevated: [5.7, 6.5], high: [6.5, 25] },
+          explanations: {
+            low: 'Your HbA1c is low. This is rare unless associated with chronic hypoglycemia or red blood cell lifespan variations.',
+            normal: 'Your HbA1c is within the healthy reference range. This indicates good average blood sugar control over the past 3 months.',
+            elevated: 'Your HbA1c is slightly elevated (pre-diabetes range). This indicates an increased risk of developing type 2 diabetes. Lifestyle modifications are recommended.',
+            high: 'Your HbA1c is high (diabetes range). This suggests active diabetes. Regular monitoring and clinical consultation are necessary.'
+          },
+          recommendations: {
+            low: 'Consult your doctor to evaluate potential nutritional deficiencies or metabolic conditions.',
+            normal: 'Continue maintaining a balanced diet, regular exercise, and healthy lifestyle habits.',
+            elevated: 'Consider reducing simple carbohydrate intake, increasing daily physical activity, and consulting a physician.',
+            high: 'Engage with a primary care provider or endocrinologist to design a glycemic management plan, which may include medication and dietary counselling.'
+          }
+        },
+        {
+          names: ['glucose fasting', 'fasting blood sugar', 'fasting sugar', 'fbs', 'fasting glucose'],
+          key: 'Glucose Fasting',
+          unit: 'mg/dL',
+          normalRange: '70 - 100 mg/dL',
+          ranges: { low: [0, 70], normal: [70, 100], elevated: [100, 126], high: [126, 1000] },
+          explanations: {
+            low: 'Your fasting blood sugar is low (hypoglycemia), which can cause shakiness, sweating, and dizziness.',
+            normal: 'Your fasting glucose is normal. This indicates healthy fasting glucose clearance and insulin sensitivity.',
+            elevated: 'Your fasting glucose is elevated (impaired fasting glucose), corresponding to pre-diabetes.',
+            high: 'Your fasting glucose is in the diabetic range. This suggests persistent hyperglycemia or insulin resistance.'
+          },
+          recommendations: {
+            low: 'Consume a fast-acting carbohydrate (e.g. fruit juice, honey) immediately, and speak to your doctor if this is recurring.',
+            normal: 'Continue with your regular diet and active lifestyle.',
+            elevated: 'Focus on low-glycemic foods, exercise regularly, and monitor blood sugar levels.',
+            high: 'Schedule a visit with your physician to discuss formal metabolic tests and potential management strategies.'
+          }
+        },
+        {
+          names: ['glucose random', 'random blood sugar', 'random glucose', 'rbs', 'blood sugar', 'glucose'],
+          key: 'Glucose Random',
+          unit: 'mg/dL',
+          normalRange: '70 - 140 mg/dL',
+          ranges: { low: [0, 70], normal: [70, 140], elevated: [140, 200], high: [200, 1000] },
+          explanations: {
+            low: 'Your blood sugar is low, indicating hypoglycemia.',
+            normal: 'Your blood sugar is in the normal random range.',
+            elevated: 'Your blood sugar is elevated. This is often seen shortly after a heavy meal but can indicate pre-diabetic tendencies.',
+            high: 'Your blood sugar is highly elevated. This suggests diabetes.'
+          },
+          recommendations: {
+            low: 'Have a snack or sugary drink, and monitor your symptoms.',
+            normal: 'Maintain regular healthy eating habits.',
+            elevated: 'Limit processed sugars, increase dietary fiber, and discuss with a doctor.',
+            high: 'Consult a medical practitioner for diagnostic follow-up and clinical management.'
+          }
+        },
+        {
+          names: ['total cholesterol', 'cholesterol total', 'cholesterol', 'tchol'],
+          key: 'Total Cholesterol',
+          unit: 'mg/dL',
+          normalRange: '100 - 200 mg/dL',
+          ranges: { low: [0, 100], normal: [100, 200], elevated: [200, 240], high: [240, 1000] },
+          explanations: {
+            low: 'Your total cholesterol is lower than standard, which is occasionally seen in malnutrition or severe liver disease.',
+            normal: 'Your total cholesterol is optimal, indicating a healthy lipid profile and lower cardiovascular risk.',
+            elevated: 'Your total cholesterol is borderline high. This increases the risk of plaque build-up in arteries over time.',
+            high: 'Your total cholesterol is high. This is a risk factor for cardiovascular diseases, coronary artery disease, and stroke.'
+          },
+          recommendations: {
+            low: 'Focus on a nutrient-rich diet with healthy fats (nuts, seeds, olive oil).',
+            normal: 'Maintain your current diet consisting of healthy fats, fiber, and regular exercise.',
+            elevated: 'Reduce saturated and trans fats, increase soluble fiber, and engage in aerobic exercise.',
+            high: 'Consult your physician. A lipid panel (HDL, LDL, Triglycerides) and cardiovascular risk assessment are advised.'
+          }
+        },
+        {
+          names: ['hemoglobin', 'hb', 'hgb'],
+          key: 'Hemoglobin',
+          unit: 'g/dL',
+          normalRange: '12.0 - 17.5 g/dL',
+          ranges: { low: [0, 12.0], normal: [12.0, 17.5], elevated: [17.5, 18.5], high: [18.5, 30] },
+          explanations: {
+            low: 'Your hemoglobin is low, suggesting anemia. This reduces the oxygen-carrying capacity of your blood, leading to fatigue.',
+            normal: 'Your hemoglobin levels are optimal, indicating healthy red blood cell counts and oxygen transport.',
+            elevated: 'Your hemoglobin is slightly elevated.',
+            high: 'Your hemoglobin is high. This can indicate dehydration, smoking, chronic hypoxia, or polycythemia.'
+          },
+          recommendations: {
+            low: 'Increase consumption of iron-rich foods (spinach, lentils, red meat) and Vitamin C. Speak to your doctor about checking ferritin levels.',
+            normal: 'Maintain a balanced diet with sufficient iron, folate, and Vitamin B12.',
+            elevated: 'Ensure you are staying properly hydrated.',
+            high: 'Drink plenty of water. Consult a physician to rule out respiratory issues, sleep apnea, or bone marrow conditions.'
+          }
+        },
+        {
+          names: ['creatinine', 'creat', 'serum creatinine'],
+          key: 'Creatinine',
+          unit: 'mg/dL',
+          normalRange: '0.6 - 1.2 mg/dL',
+          ranges: { low: [0, 0.6], normal: [0.6, 1.2], elevated: [1.2, 1.5], high: [1.5, 20] },
+          explanations: {
+            low: 'Your creatinine is low. This is often associated with low muscle mass, pregnancy, or severe malnutrition.',
+            normal: 'Your creatinine is normal, suggesting healthy glomerular filtration and kidney clearance.',
+            elevated: 'Your creatinine is borderline elevated, suggesting mild kidney strain or dehydration.',
+            high: 'Your creatinine is high. This indicates reduced kidney function or acute kidney injury.'
+          },
+          recommendations: {
+            low: 'Ensure adequate dietary protein and strength training to maintain muscle health.',
+            normal: 'Maintain healthy hydration levels (around 2-3 liters of water daily).',
+            elevated: 'Stay well-hydrated, avoid excessive protein supplements or NSAID painkillers, and check again in a few days.',
+            high: 'Consult a doctor or nephrologist immediately. Avoid taking nephrotoxic medications like ibuprofen or naproxen.'
+          }
         }
-      ],
-      generalSummary: "One or more blood markers are outside the reference range. This report requires review by your doctor. Do not self-treat.",
-      safetyDisclaimer: "Educational summary only. Not a clinical diagnosis."
-    });
+      ];
+
+      for (const def of markerDefinitions) {
+        let matchedName = null;
+        let matchIdx = -1;
+
+        for (const name of def.names) {
+          const idx = textLower.indexOf(name);
+          if (idx !== -1) {
+            matchedName = name;
+            matchIdx = idx;
+            break;
+          }
+        }
+
+        if (matchedName !== null) {
+          const substring = textLower.substring(matchIdx + matchedName.length, matchIdx + matchedName.length + 40);
+          const numMatch = substring.match(/[:\s\-\=\+]?(\d+(\.\d+)?)/);
+          if (numMatch) {
+            const val = parseFloat(numMatch[1]);
+            if (!isNaN(val)) {
+              let status = 'Normal';
+              let exp = def.explanations.normal;
+              let rec = def.recommendations.normal;
+
+              if (val < def.ranges.low[1]) {
+                status = 'Low';
+                exp = def.explanations.low;
+                rec = def.recommendations.low;
+              } else if (val >= def.ranges.high[0]) {
+                status = 'Elevated (High)';
+                exp = def.explanations.high;
+                rec = def.recommendations.high;
+              } else if (val >= def.ranges.elevated[0] && val < def.ranges.elevated[1]) {
+                status = 'Elevated';
+                exp = def.explanations.elevated;
+                rec = def.recommendations.elevated;
+              }
+
+              markers.push({
+                name: def.key,
+                value: val,
+                unit: def.unit,
+                status: status,
+                normalRange: def.normalRange,
+                explanation: exp,
+                educationalRecommendation: rec
+              });
+            }
+          }
+        }
+      }
+
+      if (markers.length === 0) {
+        markers.push({
+          name: "Glucose Fasting",
+          value: 120,
+          unit: "mg/dL",
+          status: "Elevated",
+          normalRange: "70 - 100 mg/dL",
+          explanation: "Your fasting blood sugar is 120 mg/dL, which is elevated (pre-diabetes range). This indicates impaired fasting glucose.",
+          educationalRecommendation: "Focus on reducing sugar intake, exercise regularly, and monitor your glucose levels."
+        });
+      }
+
+      return {
+        markers,
+        generalSummary: markers.some(m => m.status.toLowerCase().includes('elevated') || m.status.toLowerCase().includes('low'))
+          ? "One or more blood markers are outside the reference range. Please consult your physician for evaluation."
+          : "All blood markers parsed are within normal limits. Maintain your healthy routine.",
+        safetyDisclaimer: "Educational summary only. Not a clinical diagnosis."
+      };
+    };
+
+    return JSON.stringify(parseMockLabReport(prompt));
   }
 
   // Scenario 4: Single Medicine Details Fallback
