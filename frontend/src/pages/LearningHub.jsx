@@ -75,7 +75,8 @@ export default function LearningHub() {
   };
 
   useEffect(() => {
-    fetch('/api/health/learning/resources')
+    setLoading(true);
+    fetch(`/api/health/learning/resources?lang=${i18n.language}`)
       .then(res => res.json())
       .then(data => {
         setResources(data.resources || []);
@@ -84,7 +85,7 @@ export default function LearningHub() {
       .catch(() => {
         setLoading(false);
       });
-  }, []);
+  }, [i18n.language]);
 
   const handleReadArticle = (id, text) => {
     if (readingId === id) {

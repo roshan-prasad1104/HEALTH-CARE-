@@ -375,16 +375,24 @@ async function translateJsonFree(obj, targetLangCode) {
     return obj;
   }
 
-  const translations = await Promise.all(
-    stringsToTranslate.map(async (str) => {
+  const translations = [];
+  const batchSize = 5;
+  for (let i = 0; i < stringsToTranslate.length; i += batchSize) {
+    const batch = stringsToTranslate.slice(i, i + batchSize);
+    const batchPromises = batch.map(async (str) => {
       try {
         return await translateTextFree(str, targetLangCode);
       } catch (err) {
         console.error(`Failed to translate string "${str}":`, err.message);
         return str;
       }
-    })
-  );
+    });
+    const batchResults = await Promise.all(batchPromises);
+    translations.push(...batchResults);
+    if (i + batchSize < stringsToTranslate.length) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
 
   const resultObj = JSON.parse(JSON.stringify(obj));
   paths.forEach((path, idx) => {
@@ -680,8 +688,69 @@ async function listLearningResources(req, res) {
       }
     ];
 
-    res.status(200).json({ resources });
+    const lang = req.query.lang || 'en';
+    const langCodeToName = {
+      en: 'english',
+      hi: 'hindi',
+      te: 'telugu',
+      ta: 'tamil',
+      bn: 'bengali',
+      kn: 'kannada',
+      ml: 'malayalam',
+      mr: 'marathi',
+      gu: 'gujarati',
+      pa: 'punjabi'
+    };
+
+    const targetLangName = langCodeToName[lang.toLowerCase()] || 'english';
+    const targetLangCode = lang.toLowerCase();
+
+    if (targetLangCode === 'en' || targetLangName === 'english') {
+      return res.status(200).json({ resources });
+    }
+
+    // Try finding in database cache first
+    const resourcesJsonStr = JSON.stringify(resources);
+    const cacheKey = crypto.createHash('sha256').update(resourcesJsonStr).digest('hex');
+
+    try {
+      const cached = await prisma.multilingualContent.findFirst({
+        where: {
+          key: cacheKey,
+          language: targetLangName
+        }
+      });
+      if (cached) {
+        const translatedResources = JSON.parse(cached.translationText);
+        return res.status(200).json({ resources: translatedResources });
+      }
+    } catch (dbErr) {
+      console.warn('Learning resources DB cache check failed:', dbErr.message);
+    }
+
+    // If not in cache, translate using translateJsonFree
+    let translatedResources;
+    try {
+      translatedResources = await translateJsonFree(resources, targetLangCode);
+      
+      // Save to cache DB asynchronously
+      prisma.multilingualContent.create({
+        data: {
+          key: cacheKey,
+          language: targetLangName,
+          translationText: JSON.stringify(translatedResources)
+        }
+      }).catch((err) => {
+        console.error('Failed to save learning resources translation to cache:', err.message);
+      });
+    } catch (err) {
+      console.error('Failed to translate learning resources with Google Translate API:', err.message);
+      translatedResources = resources; // Fallback to english
+    }
+
+    res.status(200).json({ resources: translatedResources });
   } catch (error) {
+    console.error('Error fetching learning resources:', error);
     res.status(500).json({ error: 'Failed to fetch learning resources' });
   }
 }
