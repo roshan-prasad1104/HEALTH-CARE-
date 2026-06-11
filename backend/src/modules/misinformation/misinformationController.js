@@ -69,7 +69,7 @@ async function scanClaimScreenshot(req, res) {
     const filePath = req.file.path;
 
     // 1. Run OCR
-    const ocrResult = await performOcr(filePath);
+    const ocrResult = await performOcr(filePath, 'myth');
 
     // 2. Delete temporary file
     try {

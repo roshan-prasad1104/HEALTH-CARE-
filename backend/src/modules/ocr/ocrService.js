@@ -4,7 +4,7 @@ const fs = require('fs');
 /**
  * Perform OCR using Tesseract.js, falling back to Google Vision simulation if text extraction is poor.
  */
-async function performOcr(filePath) {
+async function performOcr(filePath, type = 'prescription') {
   console.log(`[OCR] Parsing file: ${filePath}`);
   
   try {
@@ -30,7 +30,7 @@ async function performOcr(filePath) {
     // 3. Fallback logic: If confidence is very low (e.g. < 40%) or text is empty, fall back to Google Vision API Simulation
     if (confidence < 40.0 || extractedText.length < 5) {
       console.warn('[OCR] Tesseract confidence low. Triggering Google Vision API fallback...');
-      return await performGoogleVisionFallback(filePath);
+      return await performGoogleVisionFallback(filePath, type);
     }
 
     return {
@@ -41,31 +41,20 @@ async function performOcr(filePath) {
 
   } catch (error) {
     console.error('[OCR Error] Tesseract process failed, falling back to Google Vision...', error);
-    return await performGoogleVisionFallback(filePath);
+    return await performGoogleVisionFallback(filePath, type);
   }
 }
 
 /**
  * Fallback parser using a mock/simulated Google Vision logic or pre-seeded matches based on file name characteristics
  */
-async function performGoogleVisionFallback(filePath) {
-  console.log('[Google Vision] Processing image...');
+async function performGoogleVisionFallback(filePath, type = 'prescription') {
+  console.log(`[Google Vision] Processing image of type: ${type}...`);
   await new Promise(resolve => setTimeout(resolve, 800)); // Mimic API latency
   
-  // Create an educational default text based on the file content (if we can infer it)
-  // Since files are uploaded, let's look at standard dummy reports.
-  // We can return a mock prescription or blood test report text depending on what is expected
-  let mockText = `
-    Rx
-    Metformin Hydrochloride 500mg
-    Dosage: One tablet twice daily with lunch and dinner.
-    Refills: 3
-    Dr. A. K. Roy, MD (Cardiology)
-  `;
-
-  // If path contains keyword, mock that specific text
-  const pathLower = filePath.toLowerCase();
-  if (pathLower.includes('report') || pathLower.includes('blood') || pathLower.includes('lab')) {
+  let mockText = '';
+  
+  if (type === 'lab') {
     mockText = `
       LABORATORY REPORT - METABOLIC PANEL
       Patient: Roshan Prasad
@@ -76,11 +65,47 @@ async function performGoogleVisionFallback(filePath) {
       Total Cholesterol    210 mg/dL   (Reference: 100 - 199)   [HIGH]
       Hemoglobin           14.2 g/dL   (Reference: 12.0 - 17.5) [NORMAL]
     `;
-  } else if (pathLower.includes('whatsapp') || pathLower.includes('myth') || pathLower.includes('forward')) {
+  } else if (type === 'myth') {
     mockText = `
       [WhatsApp Forwarded Message]
       Drinking hot boiled ginger and garlic water completely cures COVID-19 within 24 hours! Spread this to save lives!
     `;
+  } else if (type === 'prescription') {
+    mockText = `
+      Rx
+      Metformin Hydrochloride 500mg
+      Dosage: One tablet twice daily with lunch and dinner.
+      Refills: 3
+      Dr. A. K. Roy, MD (Cardiology)
+    `;
+  } else {
+    // Fallback based on file name if type is unspecified
+    const pathLower = filePath.toLowerCase();
+    if (pathLower.includes('report') || pathLower.includes('blood') || pathLower.includes('lab')) {
+      mockText = `
+        LABORATORY REPORT - METABOLIC PANEL
+        Patient: Roshan Prasad
+        Date: 2026-06-08
+        -------------------------------------
+        HbA1c                7.2 %       (Reference: 4.0 - 5.6)   [HIGH]
+        Fasting Glucose      140 mg/dL   (Reference: 70 - 99)     [HIGH]
+        Total Cholesterol    210 mg/dL   (Reference: 100 - 199)   [HIGH]
+        Hemoglobin           14.2 g/dL   (Reference: 12.0 - 17.5) [NORMAL]
+      `;
+    } else if (pathLower.includes('whatsapp') || pathLower.includes('myth') || pathLower.includes('forward')) {
+      mockText = `
+        [WhatsApp Forwarded Message]
+        Drinking hot boiled ginger and garlic water completely cures COVID-19 within 24 hours! Spread this to save lives!
+      `;
+    } else {
+      mockText = `
+        Rx
+        Metformin Hydrochloride 500mg
+        Dosage: One tablet twice daily with lunch and dinner.
+        Refills: 3
+        Dr. A. K. Roy, MD (Cardiology)
+      `;
+    }
   }
 
   return {

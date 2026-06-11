@@ -115,7 +115,7 @@ async function decodePrescription(req, res) {
 
     if (req.file) {
       const filePath = req.file.path;
-      const ocrResult = await performOcr(filePath);
+      const ocrResult = await performOcr(filePath, 'prescription');
       try {
         fs.unlinkSync(filePath);
       } catch (err) {
@@ -278,7 +278,7 @@ async function analyzeLabReport(req, res) {
 
     if (req.file) {
       const filePath = req.file.path;
-      const ocrResult = await performOcr(filePath);
+      const ocrResult = await performOcr(filePath, 'lab');
       try {
         fs.unlinkSync(filePath);
       } catch (err) {
