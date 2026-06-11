@@ -5,7 +5,13 @@ const fs = require('fs');
  * Perform OCR using Tesseract.js, falling back to Google Vision simulation if text extraction is poor.
  */
 async function performOcr(filePath, type = 'prescription') {
-  console.log(`[OCR] Parsing file: ${filePath}`);
+  console.log(`[OCR] Parsing file: ${filePath}, type hint: ${type}`);
+  
+  // Direct fallback on Vercel or in production to avoid serverless timeouts/errors
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    console.log('[OCR] Running on Vercel/Production — using fast Google Vision API fallback directly.');
+    return await performGoogleVisionFallback(filePath, type);
+  }
   
   try {
     // 1. Check if file exists
