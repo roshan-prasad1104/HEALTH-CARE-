@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
+import { Shield } from 'lucide-react';
 import { loginSuccess } from '../store/authSlice';
 
 const roles = [
@@ -93,7 +94,7 @@ export default function Signup() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#030712', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', position: 'relative', overflow: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, rgba(3, 7, 18, 0.75) 0%, rgba(3, 7, 18, 0.85) 100%), url(/background.png)', backgroundSize: 'cover', backgroundAttachment: 'fixed', backgroundPosition: 'top center', backgroundRepeat: 'no-repeat', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', position: 'relative', overflow: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
 
       {/* Background orbs */}
       <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
@@ -134,8 +135,8 @@ export default function Signup() {
 
         {/* Brand */}
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 60, height: 60, background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)', borderRadius: '1.25rem', marginBottom: '1.125rem', boxShadow: '0 8px 32px rgba(99,102,241,0.35)', position: 'relative' }}>
-            <span style={{ color: 'white', fontSize: '1.4rem', fontWeight: 800 }}>Rx</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 64, height: 64, background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', borderRadius: '1.25rem', marginBottom: '1.25rem', boxShadow: '0 8px 32px rgba(14, 165, 233, 0.35)', position: 'relative' }}>
+            <Shield size={32} color="white" strokeWidth={2.5} />
             <div style={{ position: 'absolute', inset: -1, borderRadius: '1.3rem', border: '1px solid rgba(255,255,255,0.2)', pointerEvents: 'none' }} />
           </div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 800, letterSpacing: '-0.03em', margin: '0 0 0.3rem', background: 'linear-gradient(135deg, #e2e8f0 0%, #a5b4fc 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
