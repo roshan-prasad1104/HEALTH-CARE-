@@ -5,7 +5,7 @@ const mockUsers = require('./mockAuth');
 const { JWT_SECRET } = require('../../middleware/auth');
 
 // Helper function to check if we should use mock auth
-const useMockAuth = global.dbActive === false;
+const useMockAuth = () => global.dbActive === false;
 
 async function register(req, res) {
   try {
@@ -16,7 +16,7 @@ async function register(req, res) {
     }
 
     // Use mock auth if database is unavailable
-    if (useMockAuth) {
+    if (useMockAuth()) {
       if (mockUsers.has(email)) {
         return res.status(400).json({ error: 'User with this email already exists (Mock Mode)' });
       }
@@ -110,7 +110,7 @@ async function login(req, res) {
     }
 
     // Use mock auth if database is unavailable
-    if (useMockAuth) {
+    if (useMockAuth()) {
       const user = mockUsers.get(email);
 
       if (!user || user.password !== password) {
@@ -176,7 +176,7 @@ async function login(req, res) {
 async function getMe(req, res) {
   try {
     // Use mock auth if database is unavailable
-    if (useMockAuth) {
+    if (useMockAuth()) {
       // In mock mode, we'd need to look up by email from token
       // For now, just return a generic response
       return res.status(200).json({
