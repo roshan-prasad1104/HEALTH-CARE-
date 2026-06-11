@@ -61,7 +61,7 @@ export const AccessibilityProvider = ({ children }) => {
     currentAudioRef.current = audio;
     
     // Playback rate adjustment if supported
-    audio.playbackRate = 1.5;
+    audio.playbackRate = 1.0;
 
     audio.onended = () => {
       playNextAudioChunk(langCode);
@@ -155,7 +155,7 @@ export const AccessibilityProvider = ({ children }) => {
     if (isNativeSupported) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = targetLang;
-      utterance.rate = 1.5;
+      utterance.rate = 1.0;
       utterance.pitch = 1.05;
       utterance.voice = voice;
 
