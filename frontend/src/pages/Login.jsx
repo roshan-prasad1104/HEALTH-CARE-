@@ -90,7 +90,7 @@ export default function Login() {
           <h1 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.03em', margin: '0 0 0.375rem', background: 'linear-gradient(135deg, #e2e8f0 0%, #a5b4fc 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
             PresCrypto
           </h1>
-          <p style={{ color: '#cbd5e1', fontSize: '0.875rem', margin: 0, fontWeight: 500 }}>AI-Powered Healthcare Intelligence</p>
+          <p style={{ color: '#cbd5e1', fontSize: '0.875rem', margin: 0, fontWeight: 500 }}>Healthcare Intelligence</p>
         </div>
 
         {/* Card */}
@@ -195,7 +195,7 @@ export default function Login() {
           </div>
           <div className="feature-chip">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            AI-Powered
+            Smart Analysis
           </div>
         </div>
       </div>

@@ -85,7 +85,7 @@ export default function ForgotPassword() {
           <h1 style={{ fontSize: '1.875rem', fontWeight: 800, letterSpacing: '-0.03em', margin: '0 0 0.3rem', background: 'linear-gradient(135deg, #e2e8f0 0%, #a5b4fc 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
             PresCrypto
           </h1>
-          <p style={{ color: '#cbd5e1', fontSize: '0.875rem', margin: 0, fontWeight: 500 }}>AI-Powered Healthcare Intelligence</p>
+          <p style={{ color: '#cbd5e1', fontSize: '0.875rem', margin: 0, fontWeight: 500 }}>Healthcare Intelligence</p>
         </div>
 
         {/* Card */}

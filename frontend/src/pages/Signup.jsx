@@ -143,7 +143,7 @@ export default function Signup() {
             Join PresCrypto
           </h1>
           <p style={{ color: '#cbd5e1', fontSize: '0.875rem', margin: 0, fontWeight: 500 }}>
-            Your AI-powered healthcare companion
+            Your healthcare companion
           </p>
         </div>
 
