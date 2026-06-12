@@ -295,6 +295,7 @@ export default function Navbar() {
             {profileOpen && (
               <div
                 id="user-profile-dropdown"
+                className="user-profile-dropdown-panel"
                 style={{
                   position: 'absolute',
                   top: 'calc(100% + 10px)',
@@ -315,6 +316,12 @@ export default function Navbar() {
                   @keyframes dropdownFadeIn {
                     from { opacity: 0; transform: translateY(-8px) scale(0.97); }
                     to   { opacity: 1; transform: translateY(0)    scale(1); }
+                  }
+                  @media (max-width: 767px) {
+                    .user-profile-dropdown-panel {
+                      right: auto !important;
+                      left: 0 !important;
+                    }
                   }
                   .dd-item {
                     display: flex;
