@@ -9,8 +9,8 @@ Developed with a premium, venture-backed startup design system (Glassmorphism + 
 ## 🚀 Key Features & Hero Modules
 
 ### 1. WhatsApp Medical Misinformation Scanner
-Built to stop the viral spread of alternative medicine rumors on chat networks (WhatsApp, Telegram, Facebook):
-- **OCR Screenshot Parsing**: Scans forwarded claim screenshots using server-side Tesseract.js with automatic fallback to Google Vision API.
+Built to stop the spread of alternative medicine rumors on chat networks (WhatsApp, Telegram, Facebook):
+- **Text-Based Paste Box**: Deprecated complex file uploads to allow users to directly copy-paste text forwards for instant checks.
 - **Fear-Manipulation Meter**: Evaluates the text's tone and rates it based on panic-inducing or manipulative keywords.
 - **Dangerous Remedy Detection**: Instantly flags hazardous home recipes, toxic herbal cures, or messages urging patients to ignore vaccines/cancer treatments.
 - **One-Click Debunk Generation**: Automatically generates emoji-rich fact-checking messages citing official authorities (WHO, CDC, NHS) and embeds a **"Share on WhatsApp"** button.
@@ -19,13 +19,14 @@ Built to stop the viral spread of alternative medicine rumors on chat networks (
 Translates unreadable doctor prescriptions into clear instructions:
 - **Clinical AI Processing**: Decodes drug names, generic mappings, dosages, frequencies, and durations.
 - **Drug Database & openFDA Integration**: Matches extracted drugs against local database structures and queries the openFDA API in real-time to fetch safety labels, pregnancy warnings, and side effects.
-- **Gemini Safety Cache**: If offline or not in external databases, fallbacks to Gemini API to resolve pharmacological metrics.
+- **Gemini Safety Cache**: If offline or not in external databases, falls back to Gemini API to resolve pharmacological metrics.
 
 ### 3. Lab Report Analyzer (Ophthalmology & Hematology)
 Compares lab values against standard clinical databases:
 - **Category Isolation**:
   - **🩸 Blood Biomarkers**: Analyzes general metabolic panels (Fasting Glucose, HbA1c, Cholesterol, etc.).
   - **👁️ Eye Sight / Vision**: Specially tuned for visual health parameters: Visual Acuity (Right & Left Eyes in decimal form) and Intraocular Pressure (mmHg).
+- **Client-Side Keyword Routing**: Features a lightweight local keyword-matching array (checking for terms like "sugar", "blood", "hba1c" vs "sph", "cyl", "eye", "vision") to handle category routing and cross-validation alerts cleanly without heavy external NIH/LOINC API lookups.
 - **Multi-Zone Range Visualizer**: Displays a responsive gradient bar highlighting **Low** (sky blue), **Normal** (emerald), and **Elevated/High** (rose) zones, placing the user's specific value as a dynamic node.
 - **Clinical Prompts Isolation**: Prevents cross-contamination by routing the analysis through dedicated vision prompts or blood panels depending on the active selector.
 
@@ -47,45 +48,43 @@ Provides universal access, especially for senior citizens:
 
 ### Backend
 - **Node.js (Express)**: Modular MVC structure.
-- **Tesseract.js**: Server-side OCR engine.
-- **Google Generative AI SDK**: Core integration of Gemini-1.5-flash with automated Claude/OpenAI mock fallbacks.
-- **Prisma ORM**: Interfaces PostgreSQL for profile storage, claim index caching, and multilingual lookups.
+- **Unified Gemini SDK Integration**: Integrates the official `@google/generative-ai` SDK supporting both standard (`AIza`) and Google Cloud/Pro-tier (`AQ.`) keys.
+- **Robust Model Fallback Loop**: Automatically falls back through `gemini-2.5-flash` ➔ `gemini-1.5-flash` ➔ `gemini-flash-latest` to ensure service continuity regardless of key restrictions.
+- **Prisma ORM**: Interfaces SQLite locally and PostgreSQL in production for profile storage and claim lookup.
 
 ---
 
 ## 📁 Repository Structure
 
 ```
-c:\Users\ROSHAN PRASAD\OneDrive\Desktop\Prescrypto
+.
 ├── backend/
 │   ├── prisma/
-│   │   ├── schema.prisma   # DB Model structures
-│   │   └── seed.js         # Seeding claims and lab range markers (Vision & Blood)
+│   │   ├── schema.prisma       # SQLite Schema (Local Development)
+│   │   ├── schema.prod.prisma  # PostgreSQL Schema (Vercel Production)
+│   │   └── seed.js             # Seeding claims and lab range markers (Vision & Blood)
+│   ├── scripts/
+│   │   └── prisma-generate.js  # Dedicated script to select correct database schema automatically
 │   ├── src/
-│   │   ├── config/         # Gemini connection and DB client configuration
-│   │   ├── middleware/     # JWT authentication and user session filters
+│   │   ├── config/             # Gemini connection and DB client configuration
+│   │   ├── middleware/         # JWT authentication and user session filters
 │   │   ├── modules/
-│   │   │   ├── auth/       # Registration & Login endpoints
-│   │   │   ├── ocr/        # OCR Tesseract & Google fallback services
-│   │   │   ├── ai/         # Prescription decoders and Gemini prompts logic
-│   │   │   ├── health/     # Lab report routing and OpenAI fallback
+│   │   │   ├── auth/           # Registration & Login endpoints
+│   │   │   ├── ai/             # Prescription decoders and Gemini prompts logic
+│   │   │   ├── health/         # Lab report routing and OpenAI fallback
 │   │   │   └── misinformation/ # WhatsApp scanner debunking APIs
 │   │   ├── app.js
 │   │   └── server.js
-│   ├── Dockerfile
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── components/     # UI elements (Navbar)
-│   │   ├── context/        # Speech accessibility context
-│   │   ├── i18n/           # Regional translation configurations
-│   │   ├── pages/          # Dashboard, Scanner, Lab Analyzer, Decoder, Learning Hub
-│   │   ├── store/          # Redux Store configuration
+│   │   ├── components/         # UI elements (Navbar, Layouts)
+│   │   ├── pages/              # Dashboard, Scanner, Lab Analyzer, Decoder, Learning Hub
+│   │   ├── store/              # Redux Store configuration
 │   │   ├── App.jsx
 │   │   └── main.jsx
-│   ├── Dockerfile
 │   └── package.json
-├── docker-compose.yml
+├── vercel.json                 # Core Vercel configuration with unified asset routing rules
 └── README.md
 ```
 
@@ -93,24 +92,23 @@ c:\Users\ROSHAN PRASAD\OneDrive\Desktop\Prescrypto
 
 ## ⚡ Setup & Installation
 
-### Option A: Local Run (No Docker)
+### Option A: Local Run (SQLite)
 
 #### Prerequisites
 - Node.js (v18+)
-- PostgreSQL (If offline, database services fallback to in-memory mocks and fallbacks)
 
 #### Step 1: Initialize Database (Prisma)
-Configure your PostgreSQL URL in `backend/.env`. Then run:
+Configure your `backend/.env` file. Then run:
 ```bash
 cd backend
+npm install
 npx prisma generate
-npx prisma migrate dev --name init
+npx prisma db push
 npx prisma db seed
 ```
 
 #### Step 2: Start Backend API
 ```bash
-cd backend
 npm run dev
 ```
 The Express server will launch at `http://localhost:5000`.
@@ -118,20 +116,25 @@ The Express server will launch at `http://localhost:5000`.
 #### Step 3: Start Frontend Dev Server
 ```bash
 cd ../frontend
+npm install
 npm run dev
 ```
 The React app will launch at `http://localhost:3000`.
 
 ---
 
-### Option B: Orchestrated Run (Docker Compose)
+### Option B: Production Vercel Deployment
 
-Launch the stack (PostgreSQL, Redis, Backend, Frontend) with a single command:
+PresCrypto is pre-configured to build and deploy to Vercel without manual configuration.
+
+1. **Prisma Generation**: The custom script `prisma-generate.js` automatically compiles the client targeting PostgreSQL on Vercel and SQLite locally.
+2. **Environment Fallback**: If no database URL is present, the app automatically transitions to a robust mock database state, enabling seamless zero-config trials.
+3. **Routing**: `vercel.json` maps frontend static assets (`/assets/*`), static files (`/background.png`), API calls (`/api/*`), and routes SPA requests back to `/index.html`.
+
+#### Trigger Vercel Deploy:
 ```bash
-docker-compose up --build
+npx vercel --prod --yes
 ```
-- **React Frontend**: `http://localhost:3000`
-- **Express Backend**: `http://localhost:5000`
 
 ---
 
@@ -176,7 +179,6 @@ This section serves as a direct reference to construct presentation slides and p
 ---
 
 ### 🛝 Slide 3: The Prescrypto Ecosystem
-- **OCR Engine**: Extracts handwritten notes and text from screenshots.
 - **Clinical AI Engine**: Interprets and clarifies doctor commands into patient-friendly directives.
 - **Debunking Tool**: Analyzes social media messages, scores panic indicators, and shares citation-backed debunking cards in one click.
 - **Slide Layout**:
@@ -189,7 +191,7 @@ This section serves as a direct reference to construct presentation slides and p
 ---
 
 ### 🛝 Slide 4: WhatsApp Misinformation Scanner
-- **Step 1**: Upload a screenshot of the message.
+- **Step 1**: Copy-paste a forwarded message claim.
 - **Step 2**: The parser assesses the "Fear-Manipulation Meter" (analyzing stress/alarm language).
 - **Step 3**: Generates a standard rebuttal template referencing the WHO, CDC, or NIH.
 - **Step 4**: One-click sharing back to WhatsApp.
@@ -197,24 +199,24 @@ This section serves as a direct reference to construct presentation slides and p
   - Screenshot of the misinformation scan result panel (showing the Fear manipulation index meter and the rebuttal text).
 - **⏱️ Timing**: `2:15 - 3:15` (60s)
 - **🎤 Speaker Script**:
-  > "Our flagship module is the WhatsApp Misinformation Scanner. When a user receives a suspicious message, they upload the screenshot here. The system extracts the text, scores the claim's danger level, and runs it against a checklist of dangerous remedies. It then crafts a factual check citing official sources (WHO, CDC) and provides a simple 'Share' button to send it back to the chat group, stopping rumors at their source."
+  > "Our flagship module is the WhatsApp Misinformation Scanner. When a user receives a suspicious message, they copy and paste the claim here. The system extracts the text, scores the claim's danger level, and runs it against a checklist of dangerous remedies. It then crafts a factual check citing official sources (WHO, CDC) and provides a simple 'Share' button to send it back to the chat group, stopping rumors at their source."
 
 ---
 
 ### 🛝 Slide 5: Prescription Decoder & Drug Database
-- **Advanced OCR**: Resolves doctor shorthand (Rx, bid, tid, hs) to explicit daily dosage logs.
+- **Advanced Parsing**: Resolves doctor shorthand (Rx, bid, tid, hs) to explicit daily dosage logs.
 - **RAG & Drug Database**: Cross-references medicines in our seeded directory.
 - **openFDA API Integration**: Connects to FDA databases to extract official pregnancy categories and side effects.
 - **Slide Layout**:
-  - Before/After visual: A messy handwritten prescription decoded into a clean medication schedule list.
+  - Before/After visual: A messy prescription decoded into a clean medication schedule list.
 - **⏱️ Timing**: `3:15 - 4:00` (45s)
 - **🎤 Speaker Script**:
-  > "Next is our Prescription Decoder. AI interprets the scanned prescription text, extracting drug names, dosage limits, and frequencies. Rather than leaving the patient to decode Latin abbreviations, the system maps out an explicit daily calendar. Furthermore, we query the openFDA database in real-time to fetch official pregnancy warnings and side effects, helping prevent dangerous drug interactions."
+  > "Next is our Prescription Decoder. AI interprets the prescription text, extracting drug names, dosage limits, and frequencies. Rather than leaving the patient to decode abbreviations, the system maps out an explicit daily calendar. Furthermore, we query the openFDA database in real-time to fetch official pregnancy warnings and side effects, helping prevent dangerous drug interactions."
 
 ---
 
 ### 🛝 Slide 6: Lab Report Analyzer (Isolating Blood vs. Vision)
-- **Problem**: General AI prompts confuse eye sight metrics (IOP, visual acuity) with blood panel metrics (HbA1c, glucose).
+- **Problem**: General AI prompts confuse eyesight metrics (IOP, visual acuity) with blood panel metrics (HbA1c, glucose).
 - **Prescrypto Solution**: A tabbed category selector separating "Blood Biomarkers" and "Eye Sight / Vision".
 - **Design Excellence**: Dynamically colors the UI, selects category-specific normal intervals, and draws a beautiful gradient zone map showing exact patient markers.
 - **Slide Layout**:
@@ -239,7 +241,7 @@ This section serves as a direct reference to construct presentation slides and p
 ---
 
 ### 🛝 Slide 8: Technical Architecture & Security
-- **Modern Frameworks**: React.js (Vite) + Node.js (Express) + PostgreSQL (Prisma).
+- **Modern Frameworks**: React.js (Vite) + Node.js (Express) + SQLite/PostgreSQL (Prisma).
 - **Local Fallback Design**: Works seamlessly using offline seed databases even when cloud connections fail.
 - **Double Safety Shield**: Pre-compiled regex filters block diagnosis requests or prescription writing queries.
 - **Slide Layout**:
@@ -255,7 +257,7 @@ This section serves as a direct reference to construct presentation slides and p
 Follow these steps for a live demonstration of the platform:
 
 ### Step 1: The Misinformation Scanner
-1. Open `http://localhost:3000/scanner`.
+1. Open the **WhatsApp Scanner** tab (`/scanner`).
 2. Paste the following claim in the text box:
    > *"URGENT WARNING: Drink boiled papaya leaf juice three times a day to cure cancer immediately. Doctors are hiding this cure!"*
 3. Click **Scan Claims**.
@@ -264,7 +266,7 @@ Follow these steps for a live demonstration of the platform:
 6. Hover over the text to show how **Elderly Mode** reads the fact-check out loud.
 
 ### Step 2: The Lab Analyzer (Eye Sight / Vision Mode)
-1. Navigate to the **Lab Analyzer** tab (`http://localhost:3000/lab`).
+1. Navigate to the **Lab Analyzer** tab (`/lab`).
 2. Point out the selector tabs and click on **Eye Sight / Vision**.
 3. In the text area, paste:
    > *"Visual Acuity Right: 0.6, IOP Left: 25 mmHg, Visual Acuity Left: 0.8"*
@@ -282,7 +284,7 @@ Follow these steps for a live demonstration of the platform:
 > **Answer**: Prescrypto has robust fallback logic. If the local database is unreachable, it defaults to structured in-memory mock arrays. If the translation API fails, it falls back to the original text. The platform maintains core rendering capabilities under offline settings.
 
 #### Q2: How does the system handle patient privacy and HIPAA compliance?
-> **Answer**: All uploaded images are processed on-the-fly using server-side Tesseract OCR, and any temp files are deleted from the disk (`fs.unlinkSync`) immediately after text extraction. We do not store raw images on disk, reducing data exposure risks.
+> **Answer**: All text analysis is processed dynamically and securely. Since screenshot uploads have been deprecated, patient exposure is minimized as users only input the forwarded medical rumors, maintaining complete anonymity. We do not store patient health identifiers.
 
 #### Q3: How do you prevent the AI from generating incorrect range information?
-> **Answer**: We enforce strict range comparisons. Instead of letting the AI guess reference values, the backend queries the structured Prisma database (or hardcoded fallbacks) for standard physiological boundaries. The AI's role is strictly confined to clarifying what those boundaries mean, rather than generating the boundaries themselves.
+> **Answer**: We enforce strict range comparisons. Instead of letting the AI guess reference values, the backend queries the database (or hardcoded fallbacks) for standard physiological boundaries. The AI's role is strictly confined to clarifying what those boundaries mean, rather than generating the boundaries themselves.
