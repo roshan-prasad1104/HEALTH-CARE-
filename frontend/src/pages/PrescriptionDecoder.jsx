@@ -9,7 +9,6 @@ export default function PrescriptionDecoder() {
   const { largeFont, darkMode } = useSelector(state => state.settings);
 
   const [textInput, setTextInput] = useState(() => sessionStorage.getItem('pd_textInput') || '');
-  const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(() => {
     const saved = sessionStorage.getItem('pd_result');
@@ -82,16 +81,14 @@ export default function PrescriptionDecoder() {
     }
   }, [result, loading, elderlyMode]);
 
-  const handleDecode = async (e, directFile = null) => {
+  const handleDecode = async (e) => {
     setLoading(true);
     setError(null);
     setResult(null);
     setOriginalResult(null);
 
     const formData = new FormData();
-    if (directFile) {
-      formData.append('file', directFile);
-    } else if (textInput.trim()) {
+    if (textInput.trim()) {
       formData.append('text', textInput);
     } else {
       setLoading(false);
@@ -165,14 +162,6 @@ export default function PrescriptionDecoder() {
     translateResult();
   }, [i18n.language, originalResult]);
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      handleDecode(null, selectedFile);
-    }
-  };
-
   return (
     <div className={`max-w-4xl mx-auto px-4 py-8 ${largeFont ? 'text-lg' : 'text-sm'}`}>
       
@@ -211,12 +200,12 @@ export default function PrescriptionDecoder() {
       </div>
 
       {/* Inputs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div className="max-w-xl mx-auto mb-8">
         {/* Paste Box */}
         <div className="glass-panel p-6 rounded-2xl flex flex-col justify-between">
           <div>
             <h3 className="font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <Pill className="w-4 h-4 text-indigo-400" /> Paste Prescription Text
+              <Pill className="w-4.5 h-4.5 text-indigo-400" /> Paste Prescription Text
             </h3>
             <textarea
               value={textInput}
@@ -234,34 +223,6 @@ export default function PrescriptionDecoder() {
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
             {loading ? "Decoding..." : t('prescription.decodeBtn')}
           </button>
-        </div>
-
-        {/* Upload Box */}
-        <div className="glass-panel p-6 rounded-2xl flex flex-col justify-between items-center text-center">
-          <div className="w-full">
-            <h3 className="font-bold mb-3 text-left flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <FileText className="w-4 h-4 text-brand-400" /> Upload Prescription Slip
-            </h3>
-            
-            <label className="premium-upload-zone">
-              <FileText className="w-8 h-8 mb-3 upload-icon" />
-              <p className="upload-title">
-                {file ? file.name : t('prescription.uploadBtn')}
-              </p>
-              <p className="upload-subtitle">Supports PDF, PNG, JPG, WebP</p>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </label>
-          </div>
-          <div className="w-full text-center mt-3">
-            <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-              Parses using Tesseract.js OCR and queries Gemini with safety guardrails.
-            </p>
-          </div>
         </div>
       </div>
 

@@ -228,12 +228,10 @@ export default function LabAnalyzer() {
   const { largeFont, darkMode, isPlayingSpeech, elderlyMode } = useSelector(state => state.settings);
   const { speakText, stopSpeaking } = useAccessibility();
 
-  const fileInputRef = useRef(null);
   const lastReadResultRef = useRef(null);
 
   const [analysisMode, setAnalysisMode] = useState('blood');
   const [textInput, setTextInput] = useState('');
-  const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [originalResult, setOriginalResult] = useState(null);
@@ -253,8 +251,6 @@ export default function LabAnalyzer() {
     setWarningMessage(null);
     if (!preserveInput) {
       setTextInput('');
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -321,7 +317,7 @@ export default function LabAnalyzer() {
     }
   }, [result, loading, elderlyMode]);
 
-  const handleAnalyze = async (e, directFile = null) => {
+  const handleAnalyze = async (e) => {
     e?.preventDefault?.();
     setLoading(true);
     setError(null);
@@ -329,9 +325,7 @@ export default function LabAnalyzer() {
     setOriginalResult(null);
 
     const formData = new FormData();
-    if (directFile) {
-      formData.append('file', directFile);
-    } else if (textInput.trim()) {
+    if (textInput.trim()) {
       formData.append('text', textInput);
     } else {
       setLoading(false);
@@ -391,14 +385,6 @@ export default function LabAnalyzer() {
 
     translateResult();
   }, [i18n.language, originalResult, analysisMode]);
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      handleAnalyze(null, selectedFile);
-    }
-  };
 
   const getStatusColor = (status) => {
     if (!status) return 'bg-slate-800 text-slate-200 border-slate-700';
@@ -664,7 +650,7 @@ export default function LabAnalyzer() {
       )}
 
       {/* Inputs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div className="max-w-xl mx-auto mb-8">
         <div className="glass-panel p-6 rounded-2xl flex flex-col justify-between">
           <div>
             <h3 className="font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
@@ -688,29 +674,6 @@ export default function LabAnalyzer() {
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
             {loading ? 'Analyzing...' : modeCopy.analyzeBtn}
           </button>
-        </div>
-
-        <div className="glass-panel p-6 rounded-2xl flex flex-col justify-between items-center text-center">
-          <div className="w-full">
-            <h3 className="font-bold mb-3 text-left flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <FileText className="w-4 h-4 text-brand-400" /> {modeCopy.uploadTitle}
-            </h3>
-            <label className="premium-upload-zone">
-              <FileText className="w-8 h-8 mb-3 upload-icon" />
-              <p className="upload-title">{file ? file.name : t('lab.uploadBtn')}</p>
-              <p className="upload-subtitle">Supports PDF, PNG, JPG, WebP</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </label>
-          </div>
-          <div className="w-full text-center mt-3">
-            <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>{modeCopy.uploadHint}</p>
-          </div>
         </div>
       </div>
 
