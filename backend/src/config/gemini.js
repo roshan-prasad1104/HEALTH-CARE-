@@ -11,17 +11,15 @@ const isAizaKey   = apiKey.startsWith('AIza');
 const isAqKey     = apiKey.startsWith('AQ.');
 const isMockMode  = !isAizaKey && !isAqKey;
 
-if (isAizaKey) {
-  console.log('[AI] AIza-format Gemini API key detected — using Gemini SDK.');
-} else if (isAqKey) {
-  console.log('[AI] AQ-format key detected (Pro/Cloud account) — using Gemini REST API.');
+if (!isMockMode) {
+  console.log(`[AI] Active Gemini API key detected (${isAizaKey ? 'AIza' : 'AQ'} format) — using Gemini SDK.`);
 } else {
   console.log('[AI] No valid Gemini API key found — running in enhanced simulation mode.');
 }
 
-// Standard SDK client (for AIza keys only)
+// Standard SDK client (for both key formats)
 let genAI = null;
-if (isAizaKey) {
+if (!isMockMode) {
   genAI = new GoogleGenerativeAI(apiKey);
 }
 
@@ -168,11 +166,15 @@ async function generateAIResponse(prompt, systemInstruction = '', formatJson = f
     return await simulateAiOutput(prompt, systemInstruction, 'gemini-1.5-flash');
   }
 
-  // 3a. Live call using standard SDK (AIza keys)
-  if (isAizaKey) {
+  // 3. Live call using standard SDK (for both AIza and AQ keys)
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+  let lastError = null;
+
+  for (const modelName of modelsToTry) {
     try {
+      console.log(`[AI] Attempting call using SDK with model ${modelName}...`);
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: modelName,
         generationConfig: formatJson ? { responseMimeType: 'application/json' } : undefined
       });
 
@@ -184,31 +186,29 @@ async function generateAIResponse(prompt, systemInstruction = '', formatJson = f
       const response = await result.response;
       return response.text();
     } catch (error) {
-      console.error('[AI SDK Error] Falling back to simulation:', error.message);
-      if (error.message.includes('API_KEY_INVALID') || error.message.includes('401') || error.message.includes('key not valid') || error.message.includes('invalid key')) {
-        throw new Error('Gemini API key is invalid or expired (API_KEY_INVALID). Please configure a valid standard API key in your backend/.env file.');
+      console.error(`[AI SDK Error] Failed with model ${modelName}:`, error.message);
+      lastError = error;
+      // If the error indicates invalid key/auth, we throw directly to notify user/logs
+      if (
+        error.message.includes('API_KEY_INVALID') || 
+        error.message.includes('401') || 
+        error.message.includes('key not valid') || 
+        error.message.includes('invalid key') ||
+        error.message.includes('UNAUTHENTICATED')
+      ) {
+        throw new Error('Gemini API key is invalid or expired. Please configure a valid API key.');
       }
-      return await simulateAiOutput(prompt, systemInstruction, 'gemini-1.5-flash');
+      // If it's a 404 (model not found / not supported), we continue to the next model
+      if (error.message.includes('404') || error.message.includes('not found') || error.message.includes('not supported')) {
+        continue;
+      }
+      // For any other error, break out and throw
+      break;
     }
   }
 
-  // 3b. Live call using REST API (AQ. keys — Pro/Cloud accounts)
-  if (isAqKey) {
-    try {
-      console.log('[AI] Calling Gemini REST API with AQ key...');
-      const text = await callGeminiRest(prompt, systemInstruction, formatJson);
-      console.log('[AI] Gemini REST call successful');
-      return text;
-    } catch (error) {
-      console.error('[AI REST Error]', error.message, '— falling back to simulation');
-      if (error.message.includes('401') || error.message.includes('authentication') || error.message.includes('credentials') || error.message.includes('invalid')) {
-        throw new Error('Gemini API key is invalid or expired (401 Unauthorized). Please configure a valid Pro/Cloud API key in your backend/.env file.');
-      }
-      return await simulateAiOutput(prompt, systemInstruction, 'gemini-1.5-flash');
-    }
-  }
-
-  // Safety net
+  // If all models failed, fall back to simulation mode
+  console.log('[AI] All models failed, falling back to enhanced simulation mode');
   return await simulateAiOutput(prompt, systemInstruction, 'gemini-1.5-flash');
 }
 
