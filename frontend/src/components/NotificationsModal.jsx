@@ -1,45 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { X, Bell, AlertTriangle, Info, CheckCircle, Trash2, CheckCheck } from 'lucide-react';
-
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 1, type: 'alert', read: false,
-    title: 'High-Risk WhatsApp Message Detected',
-    body: 'A message claiming "Lemon juice cures cancer" was flagged as False & Dangerous (99.5% confidence).',
-    time: '2 min ago', icon: '🚨',
-  },
-  {
-    id: 2, type: 'info', read: false,
-    title: 'Lab Report Analysis Complete',
-    body: 'Your recent blood report was analysed. HbA1c and Fasting Blood Sugar markers are within normal range.',
-    time: '1 hr ago', icon: '🧪',
-  },
-  {
-    id: 3, type: 'success', read: false,
-    title: 'Prescription Decoded Successfully',
-    body: 'Paracetamol 500mg prescription decoded. No dangerous drug interactions were detected.',
-    time: '3 hr ago', icon: '💊',
-  },
-  {
-    id: 4, type: 'warning', read: true,
-    title: 'Potential Drug Interaction Warning',
-    body: 'Atorvastatin + high-dose Paracetamol may increase hepatotoxicity risk. Consult your doctor.',
-    time: 'Yesterday', icon: '⚠️',
-  },
-  {
-    id: 5, type: 'info', read: true,
-    title: 'New Learning Module Available',
-    body: '"How to Spot Medical Misinformation" — a new module is now live in your Learning Hub.',
-    time: '2 days ago', icon: '📚',
-  },
-  {
-    id: 6, type: 'success', read: true,
-    title: 'Profile Updated',
-    body: 'Your preferred language was changed to English successfully.',
-    time: '3 days ago', icon: '✅',
-  },
-];
 
 const typeStyles = {
   alert:   { border: 'rgba(239,68,68,0.25)',  bg: 'rgba(239,68,68,0.05)',  dot: '#ef4444' },
@@ -48,17 +9,71 @@ const typeStyles = {
   success: { border: 'rgba(16,185,129,0.2)',  bg: 'rgba(16,185,129,0.04)', dot: '#34d399' },
 };
 
-export default function NotificationsModal({ onClose }) {
+const typeIcons = {
+  alert: AlertTriangle,
+  warning: AlertTriangle,
+  info: Info,
+  success: CheckCircle
+};
+
+export default function NotificationsModal({ onClose, initialNotifications = [], onRefresh }) {
   const { darkMode } = useSelector(state => state.settings || { darkMode: true });
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const token = useSelector(state => state.auth?.token);
+  const [notifications, setNotifications] = useState(initialNotifications);
   const [filter, setFilter] = useState('all'); // 'all' | 'unread'
+
+  useEffect(() => {
+    setNotifications(initialNotifications);
+  }, [initialNotifications]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAllRead = () => setNotifications(notifications.map(n => ({ ...n, read: true })));
-  const markRead = (id) => setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
-  const dismiss = (id) => setNotifications(notifications.filter(n => n.id !== id));
-  const clearAll = () => setNotifications([]);
+  const markAllRead = async () => {
+    try {
+      const res = await fetch('/api/auth/notifications/read-all', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        onRefresh?.();
+      }
+    } catch (err) {
+      console.error('Failed to mark all read:', err);
+    }
+  };
+
+  const dismiss = async (id) => {
+    try {
+      const res = await fetch(`/api/auth/notifications/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        onRefresh?.();
+      }
+    } catch (err) {
+      console.error('Failed to delete notification:', err);
+    }
+  };
+
+  const markRead = async (id) => {
+    // When clicked, dismiss the notification
+    await dismiss(id);
+  };
+
+  const clearAll = async () => {
+    try {
+      for (const n of notifications) {
+        await fetch(`/api/auth/notifications/${n.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
+    }
+  };
 
   const visible = filter === 'unread' ? notifications.filter(n => !n.read) : notifications;
 
@@ -131,6 +146,8 @@ export default function NotificationsModal({ onClose }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {visible.map(notif => {
                 const ts = typeStyles[notif.type] || typeStyles.info;
+                const Icon = typeIcons[notif.type] || Info;
+                const createdAt = notif.createdAt ? new Date(notif.createdAt).toLocaleString() : '';
                 return (
                   <div
                     key={notif.id}
@@ -147,14 +164,14 @@ export default function NotificationsModal({ onClose }) {
                     className="notif-row"
                   >
                     <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: '1.25rem', flexShrink: 0, lineHeight: 1 }}>{notif.icon}</span>
+                      <Icon size={18} style={{ color: ts.dot, flexShrink: 0, marginTop: 2 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                           {!notif.read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: ts.dot, display: 'inline-block', flexShrink: 0 }} />}
                           <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem', lineHeight: 1.3 }}>{notif.title}</span>
                         </div>
                         <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>{notif.body}</p>
-                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', marginTop: '0.375rem', display: 'block', fontWeight: 500 }}>{notif.time}</span>
+                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', marginTop: '0.375rem', display: 'block', fontWeight: 500 }}>{createdAt}</span>
                       </div>
                       <button
                         className="modal-close-btn"

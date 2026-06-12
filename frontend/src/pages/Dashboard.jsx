@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useAccessibility } from '../context/AccessibilityContext';
-import { MessageSquare, BarChart2, BookOpen, Volume2, Star, Eye, ArrowRight, Pill } from 'lucide-react';
+import { MessageSquare, BarChart2, BookOpen, Volume2, Star, Eye, ArrowRight, Pill, Shield } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { elderlyMode, largeFont, darkMode } = useSelector(state => state.settings);
+  const user = useSelector(state => state.auth?.user);
   const { getHoverSpeechProps, speakText } = useAccessibility();
 
   const handleReadIntroduction = () => {
@@ -67,6 +68,20 @@ export default function Dashboard() {
       lightIconBorder: 'rgba(245,158,11,0.25)',
     }
   ];
+
+  if (user?.role === 'Health Specialist') {
+    cards.push({
+      id: 'corrections',
+      title: 'Corrections & Consultancy',
+      desc: 'Review patient complaints, check report metrics, and submit medical verification consultancy notes.',
+      icon: Shield,
+      darkColor: "from-violet-600/20 to-indigo-600/20 border-violet-500/20 hover:border-violet-500/50",
+      darkIconCls: "bg-slate-950/80 text-violet-400 border-slate-800/60",
+      lightIconBg: 'rgba(237,233,254,0.9)',
+      lightIconColor: '#5b21b6',
+      lightIconBorder: 'rgba(139,92,246,0.25)',
+    });
+  }
 
   return (
     <div className={`dashboard-shell max-w-6xl mx-auto px-4 md:px-8 py-8 ${largeFont ? 'text-lg' : 'text-sm'}`}>

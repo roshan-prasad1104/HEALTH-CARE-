@@ -2,14 +2,12 @@
   "name": "prescrypto-backend",
   "version": "1.0.0",
   "description": "Backend service for Prescrypto",
-  "main": "src/server.js",
+  "main": "src/app.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "postinstall": "prisma generate",
-    "prisma:generate": "prisma generate",
-    "prisma:seed": "node prisma/seed.js",
-    "prisma:migrate": "prisma migrate dev"
+    "build": "echo 'Backend build: nothing to compile'",
+    "postinstall": "node scripts/prisma-generate.js"
   },
   "dependencies": {
     "@google-cloud/vertexai": "^1.12.0",

@@ -9,8 +9,12 @@ const {
   translateHealthContent,
   synthesizeVoice,
   listLearningResources,
-  streamTtsAudio
+  streamTtsAudio,
+  submitCorrectionRequest,
+  getCorrectionRequests,
+  updateCorrectionRequest
 } = require('./healthController');
+const { authenticateToken, requireRole } = require('../../middleware/auth');
 
 // Ensure tmp uploads folder exists
 const uploadDir = process.env.VERCEL
@@ -45,10 +49,14 @@ const upload = multer({
 });
 
 router.post('/prescription/decode', upload.single('file'), decodePrescription);
-router.post('/lab/analyze', upload.single('file'), analyzeLabReport);
+router.post('/lab/analyze', authenticateToken, analyzeLabReport);
 router.post('/translate', translateHealthContent);
 router.post('/voice/tts', synthesizeVoice);
 router.get('/voice/tts-stream', streamTtsAudio);
 router.get('/learning/resources', listLearningResources);
+
+router.post('/correction', authenticateToken, submitCorrectionRequest);
+router.get('/corrections', authenticateToken, requireRole(['Health Specialist']), getCorrectionRequests);
+router.put('/correction/:id', authenticateToken, requireRole(['Health Specialist']), updateCorrectionRequest);
 
 module.exports = router;

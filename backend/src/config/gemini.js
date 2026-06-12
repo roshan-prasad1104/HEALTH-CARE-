@@ -60,16 +60,22 @@ async function callGeminiRest(prompt, systemInstruction, formatJson) {
           } : {})
         });
 
+        const headers = {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        };
+        if (isAqKey) {
+          headers['Authorization'] = `Bearer ${apiKey}`;
+        } else {
+          headers['X-goog-api-key'] = apiKey;
+        }
+
         const urlObj = new URL(url);
         const options = {
           hostname: urlObj.hostname,
           path: urlObj.pathname,
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(body),
-            'X-goog-api-key': apiKey // Use standard API key header
-          }
+          headers: headers
         };
 
         const req = https.request(options, (res) => {

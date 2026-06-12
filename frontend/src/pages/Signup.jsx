@@ -5,8 +5,8 @@ import { Shield } from 'lucide-react';
 import { loginSuccess } from '../store/authSlice';
 
 const roles = [
-  { value: 'USER', label: 'Patient / General User', icon: '👤' },
-  { value: 'HEALTH_PROFESSIONAL', label: 'Healthcare Professional', icon: '🩺' },
+  { value: 'Patient', label: 'Patient / General User', icon: '👤' },
+  { value: 'Health Specialist', label: 'Health Specialist', icon: '🩺' },
 ];
 
 export default function Signup() {
@@ -22,7 +22,7 @@ export default function Signup() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'USER',
+    role: 'Patient',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -37,7 +37,7 @@ export default function Signup() {
   };
 
   const passwordStrength = (pwd) => {
-    if (pwd.length < 6) return 1;
+    if (pwd.length < 8) return 1;
     const hasSymbol = /[^A-Za-z0-9]/.test(pwd);
     if (pwd.length >= 10 && hasSymbol) return 3;
     return 2;
@@ -66,8 +66,8 @@ export default function Signup() {
       setError('Passwords do not match');
       return;
     }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
 
@@ -189,7 +189,7 @@ export default function Signup() {
                         {r.label.split(' / ')[0]}
                       </div>
                       <div style={{ fontSize: '0.6875rem', color: '#cbd5e1', marginTop: '0.125rem' }}>
-                        {r.label.split(' / ')[1] || (r.value === 'USER' ? 'Personal use' : 'Clinic / Hospital')}
+                        {r.label.split(' / ')[1] || (r.value === 'Patient' ? 'Personal use' : 'Clinic / Hospital')}
                       </div>
                     </div>
                     {formData.role === r.value && (
@@ -269,7 +269,7 @@ export default function Signup() {
                   className="auth-input-su"
                   value={formData.password}
                   onChange={handleChange}
-                  placeholder="Min. 6 characters"
+                  placeholder="Min. 8 characters"
                   required
                   autoComplete="new-password"
                   style={{ paddingRight: '3rem' }}

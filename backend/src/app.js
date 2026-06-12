@@ -38,14 +38,20 @@ app.use(express.urlencoded({ extended: true }));
 app.use(async (req, res, next) => {
   if (global.dbActive === undefined) {
     const prisma = require('./config/db');
-    try {
-      console.log('[DB] Checking Prisma connection lazily...');
-      await prisma.$connect();
-      global.dbActive = true;
-      console.log('[DB] Database connection established lazily.');
-    } catch (error) {
+    if (!prisma) {
+      // db.js returned null — no DATABASE_URL or Vercel/SQLite conflict
       global.dbActive = false;
-      console.error('[DB Warn] Database connection could not be established lazily. Falling back to mocks.', error.message);
+      console.log('[DB] No Prisma client available — running in in-memory mock mode.');
+    } else {
+      try {
+        console.log('[DB] Checking Prisma connection lazily...');
+        await prisma.$connect();
+        global.dbActive = true;
+        console.log('[DB] Database connection established lazily.');
+      } catch (error) {
+        global.dbActive = false;
+        console.error('[DB Warn] Database connection could not be established lazily. Falling back to mocks.', error.message);
+      }
     }
   }
   next();

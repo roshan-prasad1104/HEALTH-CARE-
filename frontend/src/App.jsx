@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
@@ -10,11 +10,15 @@ import LearningHub from './pages/LearningHub';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
+import CorrectionsConsultancy from './pages/CorrectionsConsultancy';
 import { Sparkles, HelpCircle } from 'lucide-react';
+import { logout, setUser } from './store/authSlice';
 
 export default function App() {
+  const dispatch = useDispatch();
   const { largeFont, darkMode } = useSelector(state => state.settings);
-  const user = useSelector(state => state.auth?.user);
+  const { user, token } = useSelector(state => state.auth || {});
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   // Toggle Tailwind dark mode class on <html> element
   useEffect(() => {
@@ -29,6 +33,45 @@ export default function App() {
     }
   }, [darkMode]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function verifySession() {
+      try {
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch('/api/auth/me', { headers });
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Session expired');
+        }
+        if (!response.ok) throw new Error('Fetch failed');
+        const data = await response.json();
+        if (!cancelled) dispatch(setUser(data.user));
+      } catch (err) {
+        if (err.message === 'Session expired') {
+          if (!cancelled) dispatch(logout());
+        }
+      } finally {
+        if (!cancelled) setSessionChecked(true);
+      }
+    }
+
+    verifySession();
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, token]);
+
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ color: 'var(--text-primary)' }}>
+        Restoring your session...
+      </div>
+    );
+  }
+
   return (
     <Routes>
       {/* Public auth pages */}
@@ -37,7 +80,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
 
       {/* Main app layout wrapper */}
-      <Route path="/" element={user ? <MainApp largeFont={largeFont} /> : <Navigate to="/login" replace />}>
+      <Route path="/" element={user ? <MainApp key={`${user.id}-${user.role}`} largeFont={largeFont} /> : <Navigate to="/login" replace />}>
         {/* Child tab routes */}
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
@@ -45,6 +88,9 @@ export default function App() {
         <Route path="prescription" element={<PrescriptionDecoder />} />
         <Route path="lab" element={<LabAnalyzer />} />
         <Route path="learning" element={<LearningHub />} />
+        {user?.role === 'Health Specialist' && (
+          <Route path="corrections" element={<CorrectionsConsultancy />} />
+        )}
         
         {/* Fallback within MainApp to dashboard */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

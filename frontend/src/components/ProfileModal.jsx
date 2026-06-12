@@ -17,6 +17,8 @@ const languages = [
 ];
 
 const roleLabels = {
+  Patient: { label: 'Patient / General User', icon: '👤', color: '#34d399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
+  'Health Specialist': { label: 'Health Specialist', icon: '🩺', color: '#818cf8', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.25)' },
   USER: { label: 'Patient / General User', icon: '👤', color: '#34d399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
   HEALTH_PROFESSIONAL: { label: 'Healthcare Professional', icon: '🩺', color: '#818cf8', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.25)' },
   ADMIN: { label: 'Administrator', icon: '⚙️', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' },

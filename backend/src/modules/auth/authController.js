@@ -4,8 +4,25 @@ const prisma = require('../../config/db');
 const mockUsers = require('./mockAuth');
 const { JWT_SECRET } = require('../../middleware/auth');
 
+const mockNotifications = [];
+
+const ALLOWED_ROLES = ['Patient', 'Health Specialist'];
+
 // Helper function to check if we should use mock auth
 const useMockAuth = () => global.dbActive === false;
+
+function normalizeRole(role) {
+  return ALLOWED_ROLES.includes(role) ? role : 'Patient';
+}
+
+function setSessionCookie(res, token, rememberMe) {
+  res.cookie('prescrypto_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
+  });
+}
 
 async function register(req, res) {
   try {
@@ -14,6 +31,12 @@ async function register(req, res) {
     if (!email || !password || !name) {
       return res.status(400).json({ error: 'Email, password, and name are required' });
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Please provide a valid email address' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
 
     // Use mock auth if database is unavailable
     if (useMockAuth()) {
@@ -21,13 +44,17 @@ async function register(req, res) {
         return res.status(400).json({ error: 'User with this email already exists (Mock Mode)' });
       }
 
+      // Hash password
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(password, salt);
+
       const userId = `user-${Date.now()}`;
       const newUser = {
         id: userId,
         email,
-        password, // Store plain text in mock mode
+        passwordHash, // Store securely hashed password in mock mode
         name,
-        role: role || 'USER',
+        role: normalizeRole(role),
         preferredLanguage: preferredLanguage || 'en'
       };
 
@@ -58,7 +85,7 @@ async function register(req, res) {
         email,
         passwordHash,
         name,
-        role: role || 'USER',
+        role: normalizeRole(role),
         preferredLanguage: preferredLanguage || 'en'
       }
     });
@@ -85,16 +112,24 @@ async function login(req, res) {
     // Use mock auth if database is unavailable
     if (useMockAuth()) {
       const user = mockUsers.get(email);
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid email or password (Mock Mode)' });
+      }
 
-      if (!user || user.password !== password) {
+      const isMatch = user.passwordHash
+        ? await bcrypt.compare(password, user.passwordHash)
+        : user.password === password;
+
+      if (!isMatch) {
         return res.status(401).json({ error: 'Invalid email or password (Mock Mode)' });
       }
 
       const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, name: user.name, role: user.role },
         JWT_SECRET,
         { expiresIn: rememberMe ? '30d' : '1d' }
       );
+      setSessionCookie(res, token, rememberMe);
 
       return res.status(200).json({
         message: 'Login successful (Mock Mode)',
@@ -123,10 +158,11 @@ async function login(req, res) {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, name: user.name, role: user.role },
       JWT_SECRET,
       { expiresIn: rememberMe ? '30d' : '1d' }
     );
+    setSessionCookie(res, token, rememberMe);
 
     res.status(200).json({
       message: 'Login successful',
@@ -150,13 +186,23 @@ async function getMe(req, res) {
   try {
     // Use mock auth if database is unavailable
     if (useMockAuth()) {
-      // In mock mode, we'd need to look up by email from token
-      // For now, just return a generic response
+      const user = Array.from(mockUsers.values()).find(u => u.id === req.user.id || u.email === req.user.email);
+      if (user) {
+        return res.status(200).json({
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            preferredLanguage: user.preferredLanguage || 'en'
+          }
+        });
+      }
       return res.status(200).json({
         user: {
           id: req.user.id,
           email: req.user.email,
-          name: 'Mock User',
+          name: req.user.name || 'Mock User',
           role: req.user.role,
           preferredLanguage: 'en'
         }
@@ -184,6 +230,15 @@ async function getMe(req, res) {
     console.error('getMe error:', error);
     res.status(500).json({ error: 'Internal server error fetching user data' });
   }
+}
+
+function logout(req, res) {
+  res.clearCookie('prescrypto_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
+  res.status(200).json({ success: true, message: 'Logged out successfully' });
 }
 
 async function forgotPassword(req, res) {
@@ -257,9 +312,117 @@ async function forgotPassword(req, res) {
   }
 }
 
+async function getNotifications(req, res) {
+  try {
+    if (global.dbActive === false) {
+      const userNotifications = mockNotifications.filter(n => n.userId === req.user.id);
+      return res.status(200).json({ notifications: userNotifications });
+    }
+
+    const notifications = await prisma.notification.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.status(200).json({ notifications });
+  } catch (err) {
+    console.error('Error fetching notifications:', err);
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+}
+
+async function markNotificationsRead(req, res) {
+  try {
+    if (global.dbActive === false) {
+      mockNotifications.forEach(n => {
+        if (n.userId === req.user.id) {
+          n.read = true;
+        }
+      });
+      return res.status(200).json({ success: true, message: 'All notifications marked as read (Mock Mode).' });
+    }
+
+    await prisma.notification.updateMany({
+      where: { userId: req.user.id },
+      data: { read: true }
+    });
+
+    res.status(200).json({ success: true, message: 'All notifications marked as read.' });
+  } catch (err) {
+    console.error('Error marking notifications read:', err);
+    res.status(500).json({ error: 'Failed to mark notifications read' });
+  }
+}
+
+async function deleteNotification(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (global.dbActive === false) {
+      const idx = mockNotifications.findIndex(n => n.id === id && n.userId === req.user.id);
+      if (idx !== -1) {
+        mockNotifications.splice(idx, 1);
+      }
+      return res.status(200).json({ success: true, message: 'Notification deleted (Mock Mode).' });
+    }
+
+    const notif = await prisma.notification.findUnique({
+      where: { id }
+    });
+
+    if (!notif || notif.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    await prisma.notification.delete({
+      where: { id }
+    });
+
+    res.status(200).json({ success: true, message: 'Notification deleted successfully.' });
+  } catch (err) {
+    console.error('Error deleting notification:', err);
+    res.status(500).json({ error: 'Failed to delete notification' });
+  }
+}
+
+async function createNotification({ userId, type, title, body }) {
+  try {
+    if (global.dbActive === false) {
+      const notif = {
+        id: `mock-notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        userId,
+        type: type || 'info',
+        title,
+        body,
+        read: false,
+        createdAt: new Date()
+      };
+      mockNotifications.unshift(notif);
+      return notif;
+    }
+
+    return await prisma.notification.create({
+      data: {
+        userId,
+        type: type || 'info',
+        title,
+        body
+      }
+    });
+  } catch (err) {
+    console.error('Failed to create notification:', err.message);
+    return null;
+  }
+}
+
 module.exports = {
   register,
   login,
+  logout,
   getMe,
-  forgotPassword
+  forgotPassword,
+  getNotifications,
+  markNotificationsRead,
+  deleteNotification,
+  createNotification
 };

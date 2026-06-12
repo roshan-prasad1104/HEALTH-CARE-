@@ -24,8 +24,10 @@ const languages = [
 ];
 
 const roleLabels = {
+  Patient: { label: 'Patient', color: '#34d399', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.25)' },
+  'Health Specialist': { label: 'Health Specialist', color: '#818cf8', bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.25)' },
   USER: { label: 'Patient', color: '#34d399', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.25)' },
-  HEALTH_PROFESSIONAL: { label: 'Health Professional', color: '#818cf8', bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.25)' },
+  HEALTH_PROFESSIONAL: { label: 'Health Specialist', color: '#818cf8', bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.25)' },
   ADMIN: { label: 'Administrator', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' },
 };
 
@@ -66,7 +68,33 @@ export default function Navbar() {
   const [activeModal, setActiveModal] = useState(null); // 'profile' | 'notifications' | 'settings'
   const dropdownRef = useRef(null);
 
-  const unreadNotifs = 3; // badge count
+  const [notifications, setNotifications] = useState([]);
+  const token = useSelector(state => state.auth?.token);
+
+  const fetchNotifications = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/auth/notifications', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+      }
+    } catch (err) {
+      console.error('Error fetching notifications in Navbar:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 5000); // poll every 5s
+    return () => clearInterval(interval);
+  }, [token]);
+
+  const unreadNotifs = notifications.filter(n => !n.read).length;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -90,8 +118,16 @@ export default function Navbar() {
     speakText(t('speech.intro'), i18n.language, true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setProfileOpen(false);
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+    } catch (err) {
+      console.error('Logout request failed:', err);
+    }
     dispatch(logout());
     navigate('/login');
   };
@@ -103,6 +139,10 @@ export default function Navbar() {
     { id: 'lab', label: t('nav.labAnalyzer') },
     { id: 'learning', label: t('nav.learningHub') }
   ];
+
+  if (user?.role === 'Health Specialist') {
+    menuItems.push({ id: 'corrections', label: 'Corrections & Consultancy' });
+  }
 
   const roleInfo = roleLabels[user?.role] || roleLabels['USER'];
   const initials = getInitials(user?.name);
@@ -451,7 +491,13 @@ export default function Navbar() {
 
     {/* ─── Modals ─── */}
     {activeModal === 'profile'       && <ProfileModal       onClose={() => setActiveModal(null)} />}
-    {activeModal === 'notifications' && <NotificationsModal onClose={() => setActiveModal(null)} />}
+    {activeModal === 'notifications' && (
+      <NotificationsModal 
+        onClose={() => setActiveModal(null)} 
+        initialNotifications={notifications} 
+        onRefresh={fetchNotifications} 
+      />
+    )}
     {activeModal === 'settings'      && <SettingsModal      onClose={() => setActiveModal(null)} />}
   </>);
 }

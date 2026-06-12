@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { performOcr } = require('../ocr/ocrService');
-const { decodePrescriptionText, analyzeLabReportText } = require('../ai/aiService');
+const { decodePrescriptionText } = require('../ai/aiService');
+const { analyzeLabText } = require('./labParser');
 const { generateAIResponse } = require('../../config/gemini');
 const prisma = require('../../config/db');
 const https = require('https');
@@ -338,66 +339,35 @@ async function decodePrescription(req, res) {
  */
 async function analyzeLabReport(req, res) {
   try {
-    let textToAnalyze = req.body.text;
-    const category = req.body.category || 'blood';
-    let ocrConfidence = null;
-    let ocrSource = null;
-
-    if (req.file) {
-      const filePath = req.file.path;
-      const fileExt = path.extname(req.file.originalname).toLowerCase();
-
-      if (fileExt === '.pdf') {
-        const pdfParse = require('pdf-parse');
-        const dataBuffer = fs.readFileSync(filePath);
-        try {
-          const pdfData = await pdfParse(dataBuffer);
-          textToAnalyze = pdfData.text;
-          ocrConfidence = 100.0;
-          ocrSource = 'Native PDF Digital Parser';
-        } catch (pdfError) {
-          console.error('[PDF Parse Error]', pdfError.message);
-          return res.status(422).json({ error: 'Failed to read digital PDF lab report' });
-        } finally {
-          try {
-            fs.unlinkSync(filePath);
-          } catch (err) {}
-        }
-      } else {
-        const ocrResult = await performOcr(filePath, category === 'vision' ? 'vision' : 'lab');
-        try {
-          fs.unlinkSync(filePath);
-        } catch (err) {
-          console.error('Failed to delete lab report file:', err.message);
-        }
-
-        if (!ocrResult.text || ocrResult.text.trim().length < 5) {
-          return res.status(422).json({ error: 'OCR could not read lab report text' });
-        }
-
-        textToAnalyze = ocrResult.text;
-        ocrConfidence = ocrResult.confidence;
-        ocrSource = ocrResult.source;
-
-        if (ocrConfidence !== null && ocrConfidence < 60.0) {
-          return res.status(422).json({
-            error: 'Unable to reliably identify lab markers from the uploaded document. Please consult a healthcare professional.'
-          });
-        }
-      }
-    }
+    const textToAnalyze = req.body.text;
+    const category = req.body.category === 'vision' ? 'vision' : 'blood';
 
     if (!textToAnalyze || textToAnalyze.trim().length === 0) {
-      return res.status(400).json({ error: 'Please provide either a text string or a file upload' });
+      return res.status(400).json({ error: 'Please paste report text before analyzing' });
     }
 
-    const analysis = await analyzeLabReportText(textToAnalyze, category);
+    const analysis = analyzeLabText(textToAnalyze, category);
+
+    if (req.user) {
+      try {
+        const { createNotification } = require('../auth/authController');
+        const isVision = category === 'vision';
+        await createNotification({
+          userId: req.user.id,
+          type: 'success',
+          title: isVision ? 'Success: Vision metrics text analyzed successfully.' : 'Success: Blood panel text analyzed successfully.',
+          body: isVision ? 'Vision metrics text analyzed successfully.' : 'Blood panel text analyzed successfully.'
+        });
+      } catch (err) {
+        console.error('Failed to create analysis notification:', err.message);
+      }
+    }
 
     res.status(200).json({
       message: 'Lab report analyzed successfully',
       extractedText: textToAnalyze,
-      ocrConfidence,
-      ocrSource,
+      ocrConfidence: null,
+      ocrSource: 'Pasted text',
       analysis
     });
 
@@ -1050,11 +1020,197 @@ function streamTtsAudio(req, res) {
   });
 }
 
+// In-memory mock store for correction requests if db is offline
+const mockCorrectionRequests = [];
+
+async function submitCorrectionRequest(req, res) {
+  try {
+    const { type, originalInput, automatedAnalysis, reason } = req.body;
+    if (!type || !originalInput || !automatedAnalysis) {
+      return res.status(400).json({ error: 'Type, originalInput, and automatedAnalysis are required' });
+    }
+
+    const { createNotification } = require('../auth/authController');
+
+    if (global.dbActive === false) {
+      const mockReq = {
+        id: `mock-corr-${Date.now()}`,
+        userId: req.user.id,
+        user: {
+          name: req.user.name || 'Mock User',
+          email: req.user.email || 'mock@example.com'
+        },
+        type,
+        originalInput,
+        automatedAnalysis,
+        reason: reason || '',
+        status: 'pending',
+        specialistNotes: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      mockCorrectionRequests.push(mockReq);
+
+      // Create patient notification
+      await createNotification({
+        userId: req.user.id,
+        type: 'success',
+        title: 'Update: Your correction request has been successfully forwarded to a Health Specialist.',
+        body: 'Your correction request has been successfully forwarded to a Health Specialist.'
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Correction request submitted successfully (Mock Mode).',
+        correction: mockReq
+      });
+    }
+
+    const correction = await prisma.correctionRequest.create({
+      data: {
+        userId: req.user.id,
+        type,
+        originalInput,
+        automatedAnalysis,
+        reason: reason || '',
+        status: 'pending'
+      }
+    });
+
+    // Create patient notification
+    await createNotification({
+      userId: req.user.id,
+      type: 'success',
+      title: 'Update: Your correction request has been successfully forwarded to a Health Specialist.',
+      body: 'Your correction request has been successfully forwarded to a Health Specialist.'
+    });
+
+    // Fetch all health specialists to notify them
+    const specialists = await prisma.user.findMany({
+      where: { role: 'Health Specialist' }
+    });
+
+    for (const spec of specialists) {
+      await createNotification({
+        userId: spec.id,
+        type: 'alert',
+        title: `Action Required: New patient correction request submitted for Review ID #${correction.id.substring(0, 8)}.`,
+        body: `New patient correction request submitted for Review ID #${correction.id.substring(0, 8)}.`
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Correction request submitted successfully.',
+      correction
+    });
+  } catch (err) {
+    console.error('Error submitting correction request:', err);
+    res.status(500).json({ error: 'Failed to submit correction request' });
+  }
+}
+
+async function getCorrectionRequests(req, res) {
+  try {
+    if (global.dbActive === false) {
+      return res.status(200).json({ corrections: mockCorrectionRequests });
+    }
+
+    const corrections = await prisma.correctionRequest.findMany({
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.status(200).json({ corrections });
+  } catch (err) {
+    console.error('Error fetching correction requests:', err);
+    res.status(500).json({ error: 'Failed to fetch correction requests' });
+  }
+}
+
+async function updateCorrectionRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const { status, specialistNotes } = req.body;
+
+    const { createNotification } = require('../auth/authController');
+
+    if (global.dbActive === false) {
+      const idx = mockCorrectionRequests.findIndex(c => c.id === id);
+      if (idx === -1) {
+        return res.status(404).json({ error: 'Correction request not found' });
+      }
+      mockCorrectionRequests[idx].status = status || mockCorrectionRequests[idx].status;
+      mockCorrectionRequests[idx].specialistNotes = specialistNotes !== undefined ? specialistNotes : mockCorrectionRequests[idx].specialistNotes;
+      mockCorrectionRequests[idx].updatedAt = new Date();
+
+      const reqUserId = mockCorrectionRequests[idx].userId;
+      await createNotification({
+        userId: reqUserId,
+        type: 'info',
+        title: 'Correction Request Resolved',
+        body: `Update: Your correction request has been reviewed. Specialist notes: ${specialistNotes || 'Reviewed'}`
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Correction request updated successfully (Mock Mode).',
+        correction: mockCorrectionRequests[idx]
+      });
+    }
+
+    const existing = await prisma.correctionRequest.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Correction request not found' });
+    }
+
+    const updated = await prisma.correctionRequest.update({
+      where: { id },
+      data: {
+        status: status || existing.status,
+        specialistNotes: specialistNotes !== undefined ? specialistNotes : existing.specialistNotes
+      }
+    });
+
+    // Notify patient that request was resolved
+    await createNotification({
+      userId: existing.userId,
+      type: 'info',
+      title: 'Correction Request Resolved',
+      body: `Update: Your correction request has been reviewed. Specialist notes: ${specialistNotes || 'Reviewed'}`
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Correction request updated successfully.',
+      correction: updated
+    });
+  } catch (err) {
+    console.error('Error updating correction request:', err);
+    res.status(500).json({ error: 'Failed to update correction request' });
+  }
+}
+
 module.exports = {
   decodePrescription,
   analyzeLabReport,
   translateHealthContent,
   synthesizeVoice,
   listLearningResources,
-  streamTtsAudio
+  streamTtsAudio,
+  submitCorrectionRequest,
+  getCorrectionRequests,
+  updateCorrectionRequest
 };
