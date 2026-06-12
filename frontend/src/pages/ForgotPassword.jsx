@@ -1,8 +1,14 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { Link, Navigate } from 'react-router-dom';
 import { Shield } from 'lucide-react';
 
 export default function ForgotPassword() {
+  const user = useSelector(state => state.auth?.user);
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

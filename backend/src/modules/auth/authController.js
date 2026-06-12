@@ -33,22 +33,9 @@ async function register(req, res) {
 
       mockUsers.set(email, newUser);
 
-      const token = jwt.sign(
-        { id: newUser.id, email: newUser.email, role: newUser.role },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
       return res.status(201).json({
-        message: 'User registered successfully (Mock Mode)',
-        token,
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          name: newUser.name,
-          role: newUser.role,
-          preferredLanguage: newUser.preferredLanguage
-        }
+        success: true,
+        message: 'Account created successfully. Please login.'
       });
     }
 
@@ -76,23 +63,9 @@ async function register(req, res) {
       }
     });
 
-    // Create token
-    const token = jwt.sign(
-      { id: newUser.id, email: newUser.email, role: newUser.role },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
     res.status(201).json({
-      message: 'User registered successfully',
-      token,
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        name: newUser.name,
-        role: newUser.role,
-        preferredLanguage: newUser.preferredLanguage
-      }
+      success: true,
+      message: 'Account created successfully. Please login.'
     });
 
   } catch (error) {
@@ -103,7 +76,7 @@ async function register(req, res) {
 
 async function login(req, res) {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -120,7 +93,7 @@ async function login(req, res) {
       const token = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
         JWT_SECRET,
-        { expiresIn: '24h' }
+        { expiresIn: rememberMe ? '30d' : '1d' }
       );
 
       return res.status(200).json({
@@ -152,7 +125,7 @@ async function login(req, res) {
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: rememberMe ? '30d' : '1d' }
     );
 
     res.status(200).json({
@@ -213,8 +186,80 @@ async function getMe(req, res) {
   }
 }
 
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    let userExists = false;
+    let userName = '';
+
+    if (useMockAuth()) {
+      if (mockUsers.has(email)) {
+        userExists = true;
+        userName = mockUsers.get(email).name;
+      }
+    } else {
+      const user = await prisma.user.findUnique({
+        where: { email }
+      });
+      if (user) {
+        userExists = true;
+        userName = user.name;
+      }
+    }
+
+    if (!userExists) {
+      return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
+    }
+
+    const nodemailer = require('nodemailer');
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = process.env.SMTP_PORT;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    const resetLink = `http://localhost:3000/reset-password?email=${encodeURIComponent(email)}&token=mock-reset-token`;
+
+    if (smtpHost && smtpPort && smtpUser && smtpPass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: parseInt(smtpPort),
+          auth: {
+            user: smtpUser,
+            pass: smtpPass
+          }
+        });
+
+        await transporter.sendMail({
+          from: `"Prescrypto Support" <${smtpUser}>`,
+          to: email,
+          subject: 'Password Reset Request',
+          text: `Hello ${userName},\n\nYou requested a password reset. Please click the following link to reset your password:\n\n${resetLink}\n\nIf you did not request this, please ignore this email.`,
+          html: `<p>Hello ${userName},</p><p>You requested a password reset. Please click the link below to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p><p>If you did not request this, please ignore this email.</p>`
+        });
+        console.log(`Password reset email sent to ${email}`);
+      } catch (err) {
+        console.error('Failed to send email via SMTP, falling back to console logging:', err);
+        console.log(`[PASSWORD RESET LINK FOR ${email}]: ${resetLink}`);
+      }
+    } else {
+      console.log(`SMTP parameters missing. [PASSWORD RESET LINK FOR ${email}]: ${resetLink}`);
+    }
+
+    return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
+  } catch (error) {
+    console.error('ForgotPassword error:', error);
+    res.status(500).json({ error: 'Internal server error during password reset request' });
+  }
+}
+
 module.exports = {
   register,
   login,
-  getMe
+  getMe,
+  forgotPassword
 };

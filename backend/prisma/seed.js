@@ -608,6 +608,38 @@ async function main() {
       maxRange: 11000.0,
       category: 'Haematology',
       description: 'Cells of the immune system involved in protecting the body against infectious disease and foreign invaders. High levels flag infection or inflammation.'
+    },
+    {
+      markerName: 'Visual Acuity (Right Eye)',
+      unit: 'decimal',
+      minRange: 0.8,
+      maxRange: 1.5,
+      category: 'Ophthalmology / Vision',
+      description: 'Visual acuity decimal score for the right eye. Standard perfect vision is 1.0 (equivalent to Snellen 20/20).'
+    },
+    {
+      markerName: 'Visual Acuity (Left Eye)',
+      unit: 'decimal',
+      minRange: 0.8,
+      maxRange: 1.5,
+      category: 'Ophthalmology / Vision',
+      description: 'Visual acuity decimal score for the left eye. Standard perfect vision is 1.0 (equivalent to Snellen 20/20).'
+    },
+    {
+      markerName: 'Intraocular Pressure (Right Eye)',
+      unit: 'mmHg',
+      minRange: 10.0,
+      maxRange: 21.0,
+      category: 'Ophthalmology / Vision',
+      description: 'Fluid pressure inside the right eye. Elevated intraocular pressure is a major risk factor for glaucoma.'
+    },
+    {
+      markerName: 'Intraocular Pressure (Left Eye)',
+      unit: 'mmHg',
+      minRange: 10.0,
+      maxRange: 21.0,
+      category: 'Ophthalmology / Vision',
+      description: 'Fluid pressure inside the left eye. Elevated intraocular pressure is a major risk factor for glaucoma.'
     }
   ];
 

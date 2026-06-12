@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toggleElderlyMode, toggleLargeFont } from '../store/settingsSlice';
 import { logout } from '../store/authSlice';
 import { useAccessibility } from '../context/AccessibilityContext';
@@ -49,10 +49,15 @@ function getAvatarGradient(name) {
   return gradients[idx];
 }
 
-export default function Navbar({ activeTab, setActiveTab }) {
+export default function Navbar() {
   const { t, i18n } = useTranslation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const currentPath = location.pathname.split('/')[1] || 'dashboard';
+  const activeTab = currentPath === '' ? 'dashboard' : currentPath;
+
   const { elderlyMode, largeFont, isPlayingSpeech, darkMode } = useSelector(state => state.settings);
   const user = useSelector(state => state.auth?.user);
   const { speakText, stopSpeaking } = useAccessibility();
@@ -111,7 +116,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
       {/* Brand Logo */}
       <div
         className="flex items-center gap-2 cursor-pointer group"
-        onClick={() => setActiveTab('dashboard')}
+        onClick={() => navigate('/dashboard')}
       >
         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-health-500 flex items-center justify-center text-white shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-all">
           <Shield className="w-5.5 h-5.5" />
@@ -139,7 +144,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
         {menuItems.map(item => (
           <button
             key={item.id}
-            onClick={() => setActiveTab(item.id)}
+            onClick={() => navigate('/' + item.id)}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 whitespace-nowrap"
             style={activeTab === item.id ? {
               background: 'linear-gradient(135deg, #6366f1, #4338ca)',
@@ -234,7 +239,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
         {/* ─── User Profile Dropdown ─── */}
         {user && (
-          <div className="absolute top-2.5 right-4 md:relative md:top-auto md:right-auto md:translate-y-0" ref={dropdownRef}>
+          <div className="relative" ref={dropdownRef}>
             {/* Avatar trigger button */}
             <button
               id="user-profile-btn"

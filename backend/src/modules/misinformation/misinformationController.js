@@ -56,7 +56,7 @@ async function scanClaimText(req, res) {
 
   } catch (error) {
     console.error('Scan text analysis error:', error);
-    res.status(500).json({ error: 'Internal server error analyzing claim' });
+    res.status(500).json({ error: error.message || 'Internal server error analyzing claim' });
   }
 }
 
@@ -133,7 +133,7 @@ async function scanClaimScreenshot(req, res) {
 
   } catch (error) {
     console.error('Screenshot scan analysis error:', error);
-    res.status(500).json({ error: 'Internal server error parsing screenshot' });
+    res.status(500).json({ error: error.message || 'Internal server error parsing screenshot' });
   }
 }
 

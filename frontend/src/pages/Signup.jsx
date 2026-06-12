@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { Shield } from 'lucide-react';
 import { loginSuccess } from '../store/authSlice';
 
@@ -10,6 +10,12 @@ const roles = [
 ];
 
 export default function Signup() {
+  const user = useSelector(state => state.auth?.user);
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -31,21 +37,17 @@ export default function Signup() {
   };
 
   const passwordStrength = (pwd) => {
-    let score = 0;
-    if (pwd.length >= 8) score++;
-    if (/[A-Z]/.test(pwd)) score++;
-    if (/[0-9]/.test(pwd)) score++;
-    if (/[^A-Za-z0-9]/.test(pwd)) score++;
-    return score;
+    if (pwd.length < 6) return 1;
+    const hasSymbol = /[^A-Za-z0-9]/.test(pwd);
+    if (pwd.length >= 10 && hasSymbol) return 3;
+    return 2;
   };
 
-  const strengthInfo = [
-    { label: 'Too short', color: '#ef4444' },
-    { label: 'Weak', color: '#f97316' },
-    { label: 'Fair', color: '#eab308' },
-    { label: 'Good', color: '#84cc16' },
-    { label: 'Strong', color: '#22c55e' },
-  ];
+  const strengthInfo = {
+    1: { label: 'Weak', color: '#ef4444' },
+    2: { label: 'Medium', color: '#eab308' },
+    3: { label: 'Strong', color: '#22c55e' }
+  };
 
   const pwdScore = passwordStrength(formData.password);
   const strengthData = formData.password.length > 0 ? strengthInfo[pwdScore] : null;
@@ -53,6 +55,12 @@ export default function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
@@ -84,8 +92,7 @@ export default function Signup() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || data.message || 'Signup failed');
 
-      dispatch(loginSuccess({ token: data.token, user: data.user }));
-      navigate('/dashboard');
+      navigate('/login', { state: { registered: true } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -279,8 +286,8 @@ export default function Signup() {
               {formData.password.length > 0 && (
                 <div style={{ marginTop: '0.625rem' }}>
                   <div style={{ display: 'flex', gap: '4px', marginBottom: '0.375rem' }}>
-                    {[0,1,2,3].map(i => (
-                      <div key={i} className="str-bar" style={{ background: i < pwdScore ? strengthData.color : 'rgba(255,255,255,0.07)' }} />
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="str-bar" style={{ background: i <= pwdScore ? strengthData.color : 'rgba(255,255,255,0.07)' }} />
                     ))}
                   </div>
                   <span style={{ fontSize: '0.75rem', color: strengthData.color, fontWeight: 500 }}>

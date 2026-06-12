@@ -1,3 +1,16 @@
+/**
+ * PRE-FIX AUDIT FINDINGS SUMMARY
+ * ------------------------------
+ * 1. Auth Module: Managed under src/modules/auth/. Handles login & registration. Token generation currently occurs inside the register controller which we must remove.
+ * 2. Misinformation Module: Under src/modules/misinformation/. Uses scanClaimText / scanClaimScreenshot which delegates to analyzeWhatsappForward in aiService.js.
+ * 3. AI Module (Rx Decoder): Managed in src/modules/ai/aiService.js. Will be updated to use pdf-parse and correct APIs.
+ * 4. Health Module (Lab Analyzer): Managed in src/modules/health/healthController.js.
+ * 5. Mock / Hardcoded Fallbacks: Identified in mockAuth.js (test users), ocrService.js (pre-seeded fallback results matching file size hash), and aiService.js (fallback lab ranges).
+ * 6. Form API Endpoints: Frontend submits register form to /api/auth/register, login to /api/auth/login, forgot password to /api/auth/forgot-password, scans to corresponding sub-routes.
+ * 7. JWT Generation: Handled in authController.js using jwt.sign and JWT_SECRET from middleware/auth.
+ * 8. AI Integration: Uses gemini-1.5-flash with @google/generative-ai SDK or REST endpoint with AQ. Cloud key.
+ * 9. Environment Variables: Stored in backend/.env (PORT, NODE_ENV, DATABASE_URL, JWT_SECRET, GEMINI_API_KEY, FDA_API_KEY).
+ */
 const express = require('express');
 const cors = require('cors');
 const path = require('path');

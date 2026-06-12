@@ -42,59 +42,69 @@ const simulatedFallbacks = {
  */
 async function callGeminiRest(prompt, systemInstruction, formatJson) {
   const https = require('https');
-  const model = 'gemini-1.5-flash';
+  const modelsToTry = ['gemini-1.5-flash', 'gemini-flash-latest'];
+  let lastError = null;
 
-  // AQ. keys are OAuth2 access tokens — use Authorization: Bearer header
-  // NOT the ?key= query parameter (which is only for AIza keys)
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  for (const model of modelsToTry) {
+    try {
+      const text = await new Promise((resolve, reject) => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const fullPrompt = systemInstruction
+          ? `System Instructions:\n${systemInstruction}\n\nUser Request:\n${prompt}`
+          : prompt;
 
-  const fullPrompt = systemInstruction
-    ? `System Instructions:\n${systemInstruction}\n\nUser Request:\n${prompt}`
-    : prompt;
+        const body = JSON.stringify({
+          contents: [{ parts: [{ text: fullPrompt }] }],
+          ...(formatJson ? {
+            generationConfig: { responseMimeType: 'application/json' }
+          } : {})
+        });
 
-  const body = JSON.stringify({
-    contents: [{ parts: [{ text: fullPrompt }] }],
-    ...(formatJson ? {
-      generationConfig: { responseMimeType: 'application/json' }
-    } : {})
-  });
-
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(url);
-    const options = {
-      hostname: urlObj.hostname,
-      path: urlObj.pathname,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-        'Authorization': `Bearer ${apiKey}`
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) {
-            console.error('[AI REST] API Error:', parsed.error.message, '(code:', parsed.error.code, ')');
-            reject(new Error(`Gemini REST Error ${parsed.error.code}: ${parsed.error.message}`));
-          } else {
-            const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            resolve(text);
+        const urlObj = new URL(url);
+        const options = {
+          hostname: urlObj.hostname,
+          path: urlObj.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body),
+            'X-goog-api-key': apiKey // Use standard API key header
           }
-        } catch (e) {
-          reject(new Error('Failed to parse Gemini REST response: ' + e.message));
-        }
-      });
-    });
+        };
 
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
+        const req = https.request(options, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.error) {
+                reject(new Error(`Gemini REST Error ${parsed.error.code}: ${parsed.error.message}`));
+              } else {
+                const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                resolve(text);
+              }
+            } catch (e) {
+              reject(new Error('Failed to parse Gemini REST response: ' + e.message));
+            }
+          });
+        });
+
+        req.on('error', reject);
+        req.write(body);
+        req.end();
+      });
+      return text;
+    } catch (err) {
+      lastError = err;
+      if (err.message.includes('404')) {
+        console.warn(`[AI REST] Model ${model} not found, trying next model...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
 }
 
 
@@ -169,6 +179,9 @@ async function generateAIResponse(prompt, systemInstruction = '', formatJson = f
       return response.text();
     } catch (error) {
       console.error('[AI SDK Error] Falling back to simulation:', error.message);
+      if (error.message.includes('API_KEY_INVALID') || error.message.includes('401') || error.message.includes('key not valid') || error.message.includes('invalid key')) {
+        throw new Error('Gemini API key is invalid or expired (API_KEY_INVALID). Please configure a valid standard API key in your backend/.env file.');
+      }
       return await simulateAiOutput(prompt, systemInstruction, 'gemini-1.5-flash');
     }
   }
@@ -182,6 +195,9 @@ async function generateAIResponse(prompt, systemInstruction = '', formatJson = f
       return text;
     } catch (error) {
       console.error('[AI REST Error]', error.message, '— falling back to simulation');
+      if (error.message.includes('401') || error.message.includes('authentication') || error.message.includes('credentials') || error.message.includes('invalid')) {
+        throw new Error('Gemini API key is invalid or expired (401 Unauthorized). Please configure a valid Pro/Cloud API key in your backend/.env file.');
+      }
       return await simulateAiOutput(prompt, systemInstruction, 'gemini-1.5-flash');
     }
   }
@@ -448,14 +464,53 @@ async function simulateAiOutput(prompt, systemInstruction, modelName) {
       };
     }
 
+    // Calculate fearScore dynamically
+    const fearKeywords = ['kill', 'die', 'death', 'cancer', 'fatal', 'cures', 'danger', 'toxic', 'poison', 'alert', 'emergency', 'warning', 'hazard', 'scare', 'hide', 'secret', 'critical', 'harmful', 'conspiracy', 'shocking', 'truth'];
+    let fearScore = 15.0;
+    fearKeywords.forEach(kw => {
+      if (promptLower.includes(kw)) {
+        fearScore += 12.0;
+      }
+    });
+    fearScore = Math.min(100.0, fearScore);
+
+    // Calculate confidenceScore dynamically
+    let hasOfficialCitation = promptLower.includes('who') || promptLower.includes('cdc') || promptLower.includes('nih') || promptLower.includes('fda') || promptLower.includes('study') || promptLower.includes('clinical') || promptLower.includes('science') || promptLower.includes('journal');
+    let confidenceScore = 50.0;
+    if (bestScore >= 10) {
+      confidenceScore = 85.0 + Math.min(14.0, bestScore);
+    } else {
+      confidenceScore = 50.0 + (hasOfficialCitation ? 20.0 : -15.0);
+    }
+    confidenceScore = Math.min(99.0, Math.max(5.0, confidenceScore));
+
+    // Determine classification and dangerous status dynamically
+    let isDangerous = bestMatch ? bestMatch.isDangerous : false;
+    let classification = bestMatch ? bestMatch.classification : "Unverified";
+    
+    if (bestScore < 10) {
+      const dangerKeywords = ['toxic', 'poison', 'stop taking', 'avoid vaccines', 'no medicine', 'ignore doctors', 'chemicals', 'cure cancer', 'cure diabetes'];
+      const isDangerousRemedy = dangerKeywords.some(dk => promptLower.includes(dk));
+      if (isDangerousRemedy) {
+        classification = "Dangerous";
+        isDangerous = true;
+      } else if (fearScore > 60.0) {
+        classification = "Misleading";
+        isDangerous = false;
+      } else {
+        classification = "Unverified";
+        isDangerous = false;
+      }
+    }
+
     const whatsappCorrectionTemplate = `*🚨 FACT CHECK: Prescrypto*\n\n❌ *Claim*: ${claim}\n\n✅ *What Science Says*:\n${bestMatch.correctionText.substring(0, 200)}...\n\n*Key Facts*:\n${bestMatch.bulletPoints.map(p => `• ${p}`).join('\n')}\n\n*Verified Sources*: ${bestMatch.sources.map(s => s.sourceName).join(', ')}\n\n_This fact-check was generated by Prescrypto Health Literacy Platform. Not a medical diagnosis._`;
 
     return JSON.stringify({
-      classification: bestMatch.classification,
+      classification: classification,
       originalClaim: claim,
-      confidenceScore: bestScore >= 15 ? 91.5 : 72.0,
-      fearScore: bestMatch.fearScore,
-      isDangerous: bestMatch.isDangerous,
+      confidenceScore: confidenceScore,
+      fearScore: fearScore,
+      isDangerous: isDangerous,
       correctionText: bestMatch.correctionText,
       whatsappCorrectionTemplate: whatsappCorrectionTemplate,
       verifiedClaims: bestMatch.sources
@@ -1787,86 +1842,252 @@ async function simulateAiOutput(prompt, systemInstruction, modelName) {
   }
 
   // Scenario 3: Lab Report Analyzer
-  if (sysLower.includes('lab') || sysLower.includes('analyzer') || promptLower.includes('hba1c') || promptLower.includes('cholesterol') || promptLower.includes('mg/dl')) {
-    const parseMockLabReport = (inputText) => {
+  if (sysLower.includes('lab') || sysLower.includes('analyzer') || promptLower.includes('hba1c') || promptLower.includes('cholesterol') || promptLower.includes('mg/dl') || promptLower.includes('vision') || promptLower.includes('acuity') || promptLower.includes('intraocular') || promptLower.includes('iop') || promptLower.includes('eye')) {
+    const forcedCategoryMatch = (sysLower + ' ' + promptLower).match(/category:(blood|vision)/);
+    const forcedCategory = forcedCategoryMatch ? forcedCategoryMatch[1] : null;
+
+    const parseMockLabReport = (inputText, categoryOverride = null) => {
       const textLower = inputText.toLowerCase();
       const markers = [];
+      const activeCategory = categoryOverride || forcedCategory;
+      const textLooksVision = textLower.includes('vision') || textLower.includes('acuity') || textLower.includes('intraocular')
+        || textLower.includes('iop') || textLower.includes('sph') || textLower.includes('cyl') || textLower.includes('axis')
+        || textLower.includes('ophthalmology') || textLower.includes('optometry') || textLower.includes('refraction');
+      const isVision = activeCategory === 'vision' || (activeCategory !== 'blood' && textLooksVision);
 
-      const markerDefinitions = [
+      const markerDefinitions = isVision ? [
+        {
+          names: ['sph right', 'sphere right', 'sph od', 'sphere od', 'od sph', 'od sphere'],
+          key: 'SPH (Right Eye / OD)',
+          unit: 'D',
+          normalRange: '-6.0 to +6.0 D',
+          ranges: { normal: [-6.0, 6.0] },
+          explanations: {
+            normal: 'Sphere power for the right eye (OD) records your refractive correction need.',
+            elevated: 'Sphere power for the right eye (OD) is outside typical refractive bounds and should be reviewed by an optometrist.'
+          },
+          recommendations: {
+            normal: 'Discuss refractive findings with an eye care professional during your next vision exam.',
+            elevated: 'Schedule an optometric review to confirm lens prescription accuracy.'
+          }
+        },
+        {
+          names: ['sph left', 'sphere left', 'sph os', 'sphere os', 'os sph', 'os sphere'],
+          key: 'SPH (Left Eye / OS)',
+          unit: 'D',
+          normalRange: '-6.0 to +6.0 D',
+          ranges: { normal: [-6.0, 6.0] },
+          explanations: {
+            normal: 'Sphere power for the left eye (OS) records your refractive correction need.',
+            elevated: 'Sphere power for the left eye (OS) is outside typical refractive bounds and should be reviewed by an optometrist.'
+          },
+          recommendations: {
+            normal: 'Discuss refractive findings with an eye care professional during your next vision exam.',
+            elevated: 'Schedule an optometric review to confirm lens prescription accuracy.'
+          }
+        },
+        {
+          names: ['cyl right', 'cylinder right', 'cyl od', 'cylinder od', 'od cyl', 'od cylinder'],
+          key: 'CYL (Right Eye / OD)',
+          unit: 'D',
+          normalRange: '-4.0 to +4.0 D',
+          ranges: { normal: [-4.0, 4.0] },
+          explanations: {
+            normal: 'Cylinder correction for the right eye (OD) measures astigmatism.',
+            elevated: 'Cylinder correction for the right eye (OD) is notable and should be verified by an eye specialist.'
+          },
+          recommendations: {
+            normal: 'Ensure corrective lenses match your latest refraction values.',
+            elevated: 'Consult an optometrist to validate astigmatism correction.'
+          }
+        },
+        {
+          names: ['cyl left', 'cylinder left', 'cyl os', 'cylinder os', 'os cyl', 'os cylinder'],
+          key: 'CYL (Left Eye / OS)',
+          unit: 'D',
+          normalRange: '-4.0 to +4.0 D',
+          ranges: { normal: [-4.0, 4.0] },
+          explanations: {
+            normal: 'Cylinder correction for the left eye (OS) measures astigmatism.',
+            elevated: 'Cylinder correction for the left eye (OS) is notable and should be verified by an eye specialist.'
+          },
+          recommendations: {
+            normal: 'Ensure corrective lenses match your latest refraction values.',
+            elevated: 'Consult an optometrist to validate astigmatism correction.'
+          }
+        },
+        {
+          names: ['axis right', 'axis od', 'od axis'],
+          key: 'AXIS (Right Eye / OD)',
+          unit: '°',
+          normalRange: '0 - 180°',
+          ranges: { normal: [0, 180] },
+          explanations: {
+            normal: 'Axis orientation for the right eye (OD) aligns cylinder correction.',
+            elevated: 'Axis value for the right eye (OD) should be confirmed during a refraction exam.'
+          },
+          recommendations: {
+            normal: 'Keep prescription records updated after each eye exam.',
+            elevated: 'Have an optometrist re-check cylinder axis alignment.'
+          }
+        },
+        {
+          names: ['axis left', 'axis os', 'os axis'],
+          key: 'AXIS (Left Eye / OS)',
+          unit: '°',
+          normalRange: '0 - 180°',
+          ranges: { normal: [0, 180] },
+          explanations: {
+            normal: 'Axis orientation for the left eye (OS) aligns cylinder correction.',
+            elevated: 'Axis value for the left eye (OS) should be confirmed during a refraction exam.'
+          },
+          recommendations: {
+            normal: 'Keep prescription records updated after each eye exam.',
+            elevated: 'Have an optometrist re-check cylinder axis alignment.'
+          }
+        },
+        {
+          names: ['visual acuity (right eye)', 'visual acuity right', 'acuity right', 'od acuity', 'right eye acuity', 'va right'],
+          key: 'Visual Acuity (Right Eye)',
+          unit: 'decimal',
+          normalRange: '0.8 - 1.5',
+          ranges: { criticalLow: [0, 0.3], low: [0.3, 0.8], normal: [0.8, 1.5] },
+          explanations: {
+            criticalLow: 'Your visual acuity in the right eye is significantly reduced. This requires clinical consultation.',
+            low: 'Your visual acuity in the right eye is reduced. This can indicate refractive error, cataracts, or other conditions.',
+            normal: 'Your visual acuity in the right eye is within normal limits. This represents standard sharp vision.',
+            elevated: 'Your visual acuity in the right eye is exceptionally sharp.'
+          },
+          recommendations: {
+            criticalLow: 'Please schedule an immediate consultation with an eye care professional.',
+            low: 'Consider visiting an optometrist or ophthalmologist for a comprehensive eye refraction test.',
+            normal: 'Maintain regular eye health habits, including matching screen time with breaks.',
+            elevated: 'Maintain regular eye health routines.'
+          }
+        },
+        {
+          names: ['visual acuity (left eye)', 'visual acuity left', 'acuity left', 'os acuity', 'left eye acuity', 'va left'],
+          key: 'Visual Acuity (Left Eye)',
+          unit: 'decimal',
+          normalRange: '0.8 - 1.5',
+          ranges: { criticalLow: [0, 0.3], low: [0.3, 0.8], normal: [0.8, 1.5] },
+          explanations: {
+            criticalLow: 'Your visual acuity in the left eye is significantly reduced. This requires clinical consultation.',
+            low: 'Your visual acuity in the left eye is reduced. This might require corrective lenses or clinical review.',
+            normal: 'Your visual acuity in the left eye is normal.',
+            elevated: 'Your visual acuity in the left eye is exceptionally sharp.'
+          },
+          recommendations: {
+            criticalLow: 'Please schedule an immediate consultation with an eye care professional.',
+            low: 'Schedule a routine eye checkup to verify if corrective lenses or updates are required.',
+            normal: 'Protect your eyes from UV rays and take regular breaks from screens.',
+            elevated: 'Maintain regular eye health routines.'
+          }
+        },
+        {
+          names: ['intraocular pressure (right eye)', 'intraocular pressure right', 'iop right', 'right eye pressure', 'right iop', 'pressure right'],
+          key: 'Intraocular Pressure (Right Eye)',
+          unit: 'mmHg',
+          normalRange: '10.0 - 21.0 mmHg',
+          ranges: { criticalLow: [0, 5.0], low: [5.0, 10.0], normal: [10.0, 21.0], elevated: [21.0, 24.0], criticalHigh: [24.0, 100.0] },
+          explanations: {
+            criticalLow: 'Your right eye fluid pressure is critically low. This requires clinical consultation.',
+            low: 'Your right eye fluid pressure is low (ocular hypotony), which is rare and requires specialist review.',
+            normal: 'Your right eye pressure is normal, indicating healthy fluid drainage balance.',
+            elevated: 'Your right eye pressure is borderline elevated, indicating a slight risk of ocular hypertension.',
+            criticalHigh: 'Your right eye pressure is critically high. Elevated pressure is a risk factor for optic nerve strain.'
+          },
+          recommendations: {
+            criticalLow: 'Consult an ophthalmologist to evaluate structural ocular conditions.',
+            low: 'Consult an ophthalmologist to rule out any underlying structural ocular conditions.',
+            normal: 'Continue with standard health guidelines and routine vision checkups.',
+            elevated: 'Regular screening is advised to monitor ocular pressure trends.',
+            criticalHigh: 'Consult an ophthalmologist promptly for complete evaluation.'
+          }
+        },
+        {
+          names: ['intraocular pressure (left eye)', 'intraocular pressure left', 'iop left', 'left eye pressure', 'left iop', 'pressure left'],
+          key: 'Intraocular Pressure (Left Eye)',
+          unit: 'mmHg',
+          normalRange: '10.0 - 21.0 mmHg',
+          ranges: { criticalLow: [0, 5.0], low: [5.0, 10.0], normal: [10.0, 21.0], elevated: [21.0, 24.0], criticalHigh: [24.0, 100.0] },
+          explanations: {
+            criticalLow: 'Your left eye fluid pressure is critically low. This requires clinical consultation.',
+            low: 'Your left eye fluid pressure is low (ocular hypotony).',
+            normal: 'Your left eye pressure is normal, indicating good drainage control.',
+            elevated: 'Your left eye pressure is borderline elevated.',
+            criticalHigh: 'Your left eye pressure is critically high. This can place strain on the optic nerve.'
+          },
+          recommendations: {
+            criticalLow: 'Speak with an eye specialist to evaluate ocular structure.',
+            low: 'Speak with an eye specialist to evaluate ocular structure.',
+            normal: 'Continue with periodic routine eye checkups.',
+            elevated: 'Monitor pressure levels with routine eye exams.',
+            criticalHigh: 'Seek a prompt clinical checkup with an eye specialist.'
+          }
+        }
+      ] : [
         {
           names: ['hba1c', 'a1c', 'hb a1c'],
           key: 'HbA1c',
           unit: '%',
           normalRange: '4.0% - 5.6%',
-          ranges: { low: [0, 4.0], normal: [4.0, 5.7], elevated: [5.7, 6.5], high: [6.5, 25] },
+          ranges: { criticalLow: [0, 3.5], low: [3.5, 4.0], normal: [4.0, 5.6], elevated: [5.6, 6.4], criticalHigh: [6.4, 25.0] },
           explanations: {
-            low: 'Your HbA1c is low. This is rare unless associated with chronic hypoglycemia or red blood cell lifespan variations.',
+            criticalLow: 'Your HbA1c is critically low. This is rare and needs clinical evaluation.',
+            low: 'Your HbA1c is low. This is rare unless associated with blood cell variations.',
             normal: 'Your HbA1c is within the healthy reference range. This indicates good average blood sugar control over the past 3 months.',
-            elevated: 'Your HbA1c is slightly elevated (pre-diabetes range). This indicates an increased risk of developing type 2 diabetes. Lifestyle modifications are recommended.',
-            high: 'Your HbA1c is high (diabetes range). This suggests active diabetes. Regular monitoring and clinical consultation are necessary.'
+            elevated: 'Your HbA1c is slightly elevated (pre-diabetes range). Lifestyle adjustments can be discussed with a clinic.',
+            criticalHigh: 'Your HbA1c is critically high. Regular monitoring and clinical consultation are necessary.'
           },
           recommendations: {
-            low: 'Consult your doctor to evaluate potential nutritional deficiencies or metabolic conditions.',
+            criticalLow: 'Consult your doctor to evaluate potential nutritional or metabolic conditions.',
+            low: 'Consult your doctor to evaluate potential nutritional or metabolic conditions.',
             normal: 'Continue maintaining a balanced diet, regular exercise, and healthy lifestyle habits.',
             elevated: 'Consider reducing simple carbohydrate intake, increasing daily physical activity, and consulting a physician.',
-            high: 'Engage with a primary care provider or endocrinologist to design a glycemic management plan, which may include medication and dietary counselling.'
+            criticalHigh: 'Engage with a primary care provider to design a management plan, which may include dietary counselling.'
           }
         },
         {
           names: ['glucose fasting', 'fasting blood sugar', 'fasting sugar', 'fbs', 'fasting glucose'],
-          key: 'Glucose Fasting',
+          key: 'Fasting Blood Sugar',
           unit: 'mg/dL',
-          normalRange: '70 - 100 mg/dL',
-          ranges: { low: [0, 70], normal: [70, 100], elevated: [100, 126], high: [126, 1000] },
+          normalRange: '70.0 - 99.0 mg/dL',
+          ranges: { criticalLow: [0, 50.0], low: [50.0, 70.0], normal: [70.0, 99.0], elevated: [99.0, 125.0], criticalHigh: [125.0, 1000.0] },
           explanations: {
+            criticalLow: 'Your fasting blood sugar is critically low. This can cause shakiness and requires immediate attention.',
             low: 'Your fasting blood sugar is low (hypoglycemia), which can cause shakiness, sweating, and dizziness.',
             normal: 'Your fasting glucose is normal. This indicates healthy fasting glucose clearance and insulin sensitivity.',
-            elevated: 'Your fasting glucose is elevated (impaired fasting glucose), corresponding to pre-diabetes.',
-            high: 'Your fasting glucose is in the diabetic range. This suggests persistent hyperglycemia or insulin resistance.'
+            elevated: 'Your fasting glucose is elevated. Lifestyle adjustments are recommended.',
+            criticalHigh: 'Your fasting glucose is critically high. This suggests persistent hyperglycemia.'
           },
           recommendations: {
+            criticalLow: 'Consume a fast-acting carbohydrate immediately and contact a clinic.',
             low: 'Consume a fast-acting carbohydrate (e.g. fruit juice, honey) immediately, and speak to your doctor if this is recurring.',
             normal: 'Continue with your regular diet and active lifestyle.',
             elevated: 'Focus on low-glycemic foods, exercise regularly, and monitor blood sugar levels.',
-            high: 'Schedule a visit with your physician to discuss formal metabolic tests and potential management strategies.'
-          }
-        },
-        {
-          names: ['glucose random', 'random blood sugar', 'random glucose', 'rbs', 'blood sugar', 'glucose'],
-          key: 'Glucose Random',
-          unit: 'mg/dL',
-          normalRange: '70 - 140 mg/dL',
-          ranges: { low: [0, 70], normal: [70, 140], elevated: [140, 200], high: [200, 1000] },
-          explanations: {
-            low: 'Your blood sugar is low, indicating hypoglycemia.',
-            normal: 'Your blood sugar is in the normal random range.',
-            elevated: 'Your blood sugar is elevated. This is often seen shortly after a heavy meal but can indicate pre-diabetic tendencies.',
-            high: 'Your blood sugar is highly elevated. This suggests diabetes.'
-          },
-          recommendations: {
-            low: 'Have a snack or sugary drink, and monitor your symptoms.',
-            normal: 'Maintain regular healthy eating habits.',
-            elevated: 'Limit processed sugars, increase dietary fiber, and discuss with a doctor.',
-            high: 'Consult a medical practitioner for diagnostic follow-up and clinical management.'
+            criticalHigh: 'Schedule a visit with your physician to discuss metabolic tests and management strategies.'
           }
         },
         {
           names: ['total cholesterol', 'cholesterol total', 'cholesterol', 'tchol'],
           key: 'Total Cholesterol',
           unit: 'mg/dL',
-          normalRange: '100 - 200 mg/dL',
-          ranges: { low: [0, 100], normal: [100, 200], elevated: [200, 240], high: [240, 1000] },
+          normalRange: '100.0 - 199.0 mg/dL',
+          ranges: { criticalLow: [0, 70.0], low: [70.0, 100.0], normal: [100.0, 199.0], elevated: [199.0, 239.0], criticalHigh: [239.0, 1000.0] },
           explanations: {
-            low: 'Your total cholesterol is lower than standard, which is occasionally seen in malnutrition or severe liver disease.',
+            criticalLow: 'Your total cholesterol is critically low. This is rare and requires diagnostic review.',
+            low: 'Your total cholesterol is lower than standard, which is occasionally seen in malnutrition.',
             normal: 'Your total cholesterol is optimal, indicating a healthy lipid profile and lower cardiovascular risk.',
-            elevated: 'Your total cholesterol is borderline high. This increases the risk of plaque build-up in arteries over time.',
-            high: 'Your total cholesterol is high. This is a risk factor for cardiovascular diseases, coronary artery disease, and stroke.'
+            elevated: 'Your total cholesterol is borderline high.',
+            criticalHigh: 'Your total cholesterol is critically high. This increases the risk of plaque build-up in arteries.'
           },
           recommendations: {
+            criticalLow: 'Focus on a nutrient-rich diet with healthy fats and consult a doctor.',
             low: 'Focus on a nutrient-rich diet with healthy fats (nuts, seeds, olive oil).',
             normal: 'Maintain your current diet consisting of healthy fats, fiber, and regular exercise.',
             elevated: 'Reduce saturated and trans fats, increase soluble fiber, and engage in aerobic exercise.',
-            high: 'Consult your physician. A lipid panel (HDL, LDL, Triglycerides) and cardiovascular risk assessment are advised.'
+            criticalHigh: 'Consult your physician. A lipid panel and cardiovascular risk assessment are advised.'
           }
         },
         {
@@ -1874,37 +2095,41 @@ async function simulateAiOutput(prompt, systemInstruction, modelName) {
           key: 'Hemoglobin',
           unit: 'g/dL',
           normalRange: '12.0 - 17.5 g/dL',
-          ranges: { low: [0, 12.0], normal: [12.0, 17.5], elevated: [17.5, 18.5], high: [18.5, 30] },
+          ranges: { criticalLow: [0, 8.0], low: [8.0, 12.0], normal: [12.0, 17.5], elevated: [17.5, 19.0], criticalHigh: [19.0, 30.0] },
           explanations: {
+            criticalLow: 'Your hemoglobin is critically low. This indicates severe anemia and requires clinical care.',
             low: 'Your hemoglobin is low, suggesting anemia. This reduces the oxygen-carrying capacity of your blood, leading to fatigue.',
             normal: 'Your hemoglobin levels are optimal, indicating healthy red blood cell counts and oxygen transport.',
             elevated: 'Your hemoglobin is slightly elevated.',
-            high: 'Your hemoglobin is high. This can indicate dehydration, smoking, chronic hypoxia, or polycythemia.'
+            criticalHigh: 'Your hemoglobin is critically high. This can indicate chronic hypoxia or dehydration.'
           },
           recommendations: {
-            low: 'Increase consumption of iron-rich foods (spinach, lentils, red meat) and Vitamin C. Speak to your doctor about checking ferritin levels.',
+            criticalLow: 'Seek immediate clinical consultation and follow up with blood tests.',
+            low: 'Increase consumption of iron-rich foods (spinach, lentils, red meat) and Vitamin C. Speak to your doctor.',
             normal: 'Maintain a balanced diet with sufficient iron, folate, and Vitamin B12.',
             elevated: 'Ensure you are staying properly hydrated.',
-            high: 'Drink plenty of water. Consult a physician to rule out respiratory issues, sleep apnea, or bone marrow conditions.'
+            criticalHigh: 'Drink plenty of water. Consult a physician to rule out respiratory issues.'
           }
         },
         {
-          names: ['creatinine', 'creat', 'serum creatinine'],
-          key: 'Creatinine',
-          unit: 'mg/dL',
-          normalRange: '0.6 - 1.2 mg/dL',
-          ranges: { low: [0, 0.6], normal: [0.6, 1.2], elevated: [1.2, 1.5], high: [1.5, 20] },
+          names: ['white blood cell count (wbc)', 'white blood cell', 'wbc', 'white cells'],
+          key: 'White Blood Cell Count (WBC)',
+          unit: 'cells/mcL',
+          normalRange: '4500.0 - 11000.0 cells/mcL',
+          ranges: { criticalLow: [0, 2000.0], low: [2000.0, 4500.0], normal: [4500.0, 11000.0], elevated: [11000.0, 15000.0], criticalHigh: [15000.0, 100000.0] },
           explanations: {
-            low: 'Your creatinine is low. This is often associated with low muscle mass, pregnancy, or severe malnutrition.',
-            normal: 'Your creatinine is normal, suggesting healthy glomerular filtration and kidney clearance.',
-            elevated: 'Your creatinine is borderline elevated, suggesting mild kidney strain or dehydration.',
-            high: 'Your creatinine is high. This indicates reduced kidney function or acute kidney injury.'
+            criticalLow: 'Your WBC is critically low. This compromises immune function and requires clinical evaluation.',
+            low: 'Your WBC is low. This may indicate reduced immunity.',
+            normal: 'Your WBC is normal, indicating active and standard immune defense.',
+            elevated: 'Your WBC is elevated. This is commonly seen during mild infections.',
+            criticalHigh: 'Your WBC is critically high. This suggests significant infection or inflammation.'
           },
           recommendations: {
-            low: 'Ensure adequate dietary protein and strength training to maintain muscle health.',
-            normal: 'Maintain healthy hydration levels (around 2-3 liters of water daily).',
-            elevated: 'Stay well-hydrated, avoid excessive protein supplements or NSAID painkillers, and check again in a few days.',
-            high: 'Consult a doctor or nephrologist immediately. Avoid taking nephrotoxic medications like ibuprofen or naproxen.'
+            criticalLow: 'Consult a physician immediately to rule out serious immunologic causes.',
+            low: 'Consult a doctor to monitor your immune system.',
+            normal: 'Continue maintaining a healthy, active lifestyle.',
+            elevated: 'Stay hydrated and rest. Speak to a doctor if symptoms persist.',
+            criticalHigh: 'Please consult a medical practitioner for further diagnostic checks.'
           }
         }
       ];
@@ -1932,18 +2157,28 @@ async function simulateAiOutput(prompt, systemInstruction, modelName) {
               let exp = def.explanations.normal;
               let rec = def.recommendations.normal;
 
-              if (val < def.ranges.low[1]) {
+              const hasFullRanges = def.ranges.criticalLow || def.ranges.low || def.ranges.criticalHigh || def.ranges.elevated;
+
+              if (def.ranges.criticalLow && val < def.ranges.criticalLow[1]) {
+                status = 'Critical Low';
+                exp = def.explanations.criticalLow;
+                rec = def.recommendations.criticalLow;
+              } else if (def.ranges.low && val < def.ranges.normal[0]) {
                 status = 'Low';
                 exp = def.explanations.low;
                 rec = def.recommendations.low;
-              } else if (val >= def.ranges.high[0]) {
-                status = 'Elevated (High)';
-                exp = def.explanations.high;
-                rec = def.recommendations.high;
-              } else if (val >= def.ranges.elevated[0] && val < def.ranges.elevated[1]) {
+              } else if (def.ranges.criticalHigh && val >= def.ranges.criticalHigh[0]) {
+                status = 'Critical High';
+                exp = def.explanations.criticalHigh;
+                rec = def.recommendations.criticalHigh;
+              } else if (hasFullRanges && val > def.ranges.normal[1]) {
                 status = 'Elevated';
                 exp = def.explanations.elevated;
                 rec = def.recommendations.elevated;
+              } else if (val < def.ranges.normal[0] || val > def.ranges.normal[1]) {
+                status = 'Recorded';
+                exp = def.explanations.elevated || def.explanations.normal;
+                rec = def.recommendations.elevated || def.recommendations.normal;
               }
 
               markers.push({
@@ -1961,27 +2196,106 @@ async function simulateAiOutput(prompt, systemInstruction, modelName) {
       }
 
       if (markers.length === 0) {
-        markers.push({
-          name: "Glucose Fasting",
-          value: 120,
-          unit: "mg/dL",
-          status: "Elevated",
-          normalRange: "70 - 100 mg/dL",
-          explanation: "Your fasting blood sugar is 120 mg/dL, which is elevated (pre-diabetes range). This indicates impaired fasting glucose.",
-          educationalRecommendation: "Focus on reducing sugar intake, exercise regularly, and monitor your glucose levels."
-        });
+        if (isVision) {
+          markers.push(
+            {
+              name: "Visual Acuity (Right Eye)",
+              value: 0.7,
+              unit: "decimal",
+              status: "Low",
+              normalRange: "0.8 - 1.5",
+              explanation: "Your visual acuity in the right eye is 0.7, which is below the normal standard.",
+              educationalRecommendation: "Consider a routine refractive eye checkup for visual correctness."
+            },
+            {
+              name: "Visual Acuity (Left Eye)",
+              value: 0.5,
+              unit: "decimal",
+              status: "Low",
+              normalRange: "0.8 - 1.5",
+              explanation: "Your visual acuity in the left eye is 0.5, showing reduced focus acuity.",
+              educationalRecommendation: "Schedule an optometric review for custom lenses if necessary."
+            },
+            {
+              name: "Intraocular Pressure (Right Eye)",
+              value: 24.0,
+              unit: "mmHg",
+              status: "Critical High",
+              normalRange: "10.0 - 21.0 mmHg",
+              explanation: "Your right eye pressure is 24 mmHg. High fluid pressure can strain the optic nerve.",
+              educationalRecommendation: "Consult an eye specialist to evaluate ocular structures."
+            },
+            {
+              name: "Intraocular Pressure (Left Eye)",
+              value: 22.0,
+              unit: "mmHg",
+              status: "Elevated",
+              normalRange: "10.0 - 21.0 mmHg",
+              explanation: "Your left eye pressure is borderline elevated at 22 mmHg.",
+              educationalRecommendation: "Periodic screenings are recommended to monitor pressure trends."
+            }
+          );
+        } else {
+          markers.push(
+            {
+              name: "HbA1c",
+              value: 7.2,
+              unit: "%",
+              status: "Critical High",
+              normalRange: "4.0% - 5.6%",
+              explanation: "Your HbA1c is 7.2%, which is critically high. This indicates average blood sugar levels over the past 3 months are above normal limits.",
+              educationalRecommendation: "Please consult a primary care provider to design a management plan, which may include dietary adjustments."
+            },
+            {
+              name: "Fasting Blood Sugar",
+              value: 145.0,
+              unit: "mg/dL",
+              status: "Critical High",
+              normalRange: "70.0 - 99.0 mg/dL",
+              explanation: "Your fasting glucose is 145 mg/dL, indicating fasting hyperglycemia.",
+              educationalRecommendation: "Avoid simple sugars, align meals with high-fiber choices, and seek physician input."
+            },
+            {
+              name: "Total Cholesterol",
+              value: 240.0,
+              unit: "mg/dL",
+              status: "Critical High",
+              normalRange: "100.0 - 199.0 mg/dL",
+              explanation: "Your cholesterol is 240 mg/dL, which is elevated.",
+              educationalRecommendation: "Integrate cardiovascular exercises and lower intake of saturated fats."
+            },
+            {
+              name: "Hemoglobin",
+              value: 11.0,
+              unit: "g/dL",
+              status: "Low",
+              normalRange: "12.0 - 17.5 g/dL",
+              explanation: "Your hemoglobin level is 11 g/dL, which is low.",
+              educationalRecommendation: "Evaluate dietary iron sources like green leafy vegetables and consult your doctor."
+            },
+            {
+              name: "White Blood Cell Count (WBC)",
+              value: 12000.0,
+              unit: "cells/mcL",
+              status: "Elevated",
+              normalRange: "4500.0 - 11000.0 cells/mcL",
+              explanation: "Your white blood cell count is 12,000 cells/mcL, which is elevated.",
+              educationalRecommendation: "This can flag general immune response. Consult a physician to trace standard causes."
+            }
+          );
+        }
       }
 
       return {
         markers,
         generalSummary: markers.some(m => m.status.toLowerCase().includes('elevated') || m.status.toLowerCase().includes('low'))
-          ? "One or more blood markers are outside the reference range. Please consult your physician for evaluation."
-          : "All blood markers parsed are within normal limits. Maintain your healthy routine.",
+          ? (isVision ? "One or more visual/ocular parameters are outside reference ranges. A consult with an eye specialist is advised." : "One or more blood markers are outside the reference range. Please consult your physician for evaluation.")
+          : (isVision ? "All eye pressure and visual acuity readings are within normal parameters." : "All blood markers parsed are within normal limits. Maintain your healthy routine."),
         safetyDisclaimer: "Educational summary only. Not a clinical diagnosis."
       };
     };
 
-    return JSON.stringify(parseMockLabReport(prompt));
+    return JSON.stringify(parseMockLabReport(prompt, forcedCategory));
   }
 
   // Scenario 4: Single Medicine Details Fallback

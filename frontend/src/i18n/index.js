@@ -294,7 +294,7 @@ const resources = {
         explanation: "సాధారణ వివరణ"
       },
       learning: {
-        title: "ಆರೋಗ್ಯ ಅವಗಾಹನ ಕೇಂದ್ರ", // wait, let's use the te block title
+        title: "ఆరోగ్య అవగాహన కేంద్రం", // wait, let's use the te block title
         desc: "వైద్య రూపాలను చదవడానికి మరియు ఆన్‌లైన్ అబద్ధాలను గుర్తించడానికి గైడ్‌లు చదవండి.",
         quiz: {
           title: "రోజువారీ ఆరోగ్య అవగాహన సవాలు",

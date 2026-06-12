@@ -8,12 +8,38 @@ export default function PrescriptionDecoder() {
   const { t, i18n } = useTranslation();
   const { largeFont, darkMode } = useSelector(state => state.settings);
 
-  const [textInput, setTextInput] = useState('');
+  const [textInput, setTextInput] = useState(() => sessionStorage.getItem('pd_textInput') || '');
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [originalResult, setOriginalResult] = useState(null);
+  const [result, setResult] = useState(() => {
+    const saved = sessionStorage.getItem('pd_result');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [originalResult, setOriginalResult] = useState(() => {
+    const saved = sessionStorage.getItem('pd_originalResult');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    sessionStorage.setItem('pd_textInput', textInput);
+  }, [textInput]);
+
+  useEffect(() => {
+    if (result) {
+      sessionStorage.setItem('pd_result', JSON.stringify(result));
+    } else {
+      sessionStorage.removeItem('pd_result');
+    }
+  }, [result]);
+
+  useEffect(() => {
+    if (originalResult) {
+      sessionStorage.setItem('pd_originalResult', JSON.stringify(originalResult));
+    } else {
+      sessionStorage.removeItem('pd_originalResult');
+    }
+  }, [originalResult]);
 
   const { isPlayingSpeech, elderlyMode } = useSelector(state => state.settings);
   const { speakText, stopSpeaking } = useAccessibility();
@@ -114,7 +140,8 @@ export default function PrescriptionDecoder() {
           gu: 'Gujarati',
           pa: 'Punjabi'
         };
-        const targetLanguage = langMap[i18n.language] || 'English';
+        const cleanLang = i18n.language ? i18n.language.split('-')[0].split('_')[0].toLowerCase() : 'en';
+        const targetLanguage = langMap[cleanLang] || 'English';
         
         const response = await fetch('/api/health/translate', {
           method: 'POST',
@@ -295,7 +322,7 @@ export default function PrescriptionDecoder() {
                     </div>
                     {med.safetyCategory && (
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border ${
-                        med.safetyCategory.toLowerCase().includes('safe') 
+                        (originalResult?.medicines?.[idx]?.safetyCategory || med.safetyCategory).toLowerCase().includes('safe') 
                           ? 'bg-green-500/10 text-green-400 border-green-500/20' 
                           : 'bg-orange-500/10 text-orange-400 border-orange-500/20'
                       }`}>

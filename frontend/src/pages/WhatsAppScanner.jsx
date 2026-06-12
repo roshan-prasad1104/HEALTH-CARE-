@@ -110,12 +110,38 @@ export default function WhatsAppScanner() {
   const { t, i18n } = useTranslation();
   const { largeFont, darkMode } = useSelector(state => state.settings);
 
-  const [textInput, setTextInput] = useState('');
+  const [textInput, setTextInput] = useState(() => sessionStorage.getItem('wp_textInput') || '');
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [originalResult, setOriginalResult] = useState(null);
+  const [result, setResult] = useState(() => {
+    const saved = sessionStorage.getItem('wp_result');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [originalResult, setOriginalResult] = useState(() => {
+    const saved = sessionStorage.getItem('wp_originalResult');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    sessionStorage.setItem('wp_textInput', textInput);
+  }, [textInput]);
+
+  useEffect(() => {
+    if (result) {
+      sessionStorage.setItem('wp_result', JSON.stringify(result));
+    } else {
+      sessionStorage.removeItem('wp_result');
+    }
+  }, [result]);
+
+  useEffect(() => {
+    if (originalResult) {
+      sessionStorage.setItem('wp_originalResult', JSON.stringify(originalResult));
+    } else {
+      sessionStorage.removeItem('wp_originalResult');
+    }
+  }, [originalResult]);
 
   const { isPlayingSpeech, elderlyMode } = useSelector(state => state.settings);
   const { speakText, stopSpeaking } = useAccessibility();
@@ -235,7 +261,8 @@ export default function WhatsAppScanner() {
           gu: 'Gujarati',
           pa: 'Punjabi'
         };
-        const targetLanguage = langMap[i18n.language] || 'English';
+        const cleanLang = i18n.language ? i18n.language.split('-')[0].split('_')[0].toLowerCase() : 'en';
+        const targetLanguage = langMap[cleanLang] || 'English';
         
         const response = await fetch('/api/health/translate', {
           method: 'POST',
@@ -387,7 +414,7 @@ export default function WhatsAppScanner() {
                   </>
                 )}
               </button>
-              <div className={`px-4 py-1.5 rounded-full border text-xs font-black uppercase ${getClassificationColor(result.classification)}`}>
+              <div className={`px-4 py-1.5 rounded-full border text-xs font-black uppercase ${getClassificationColor(originalResult?.classification || result.classification)}`}>
                 {result.classification}
               </div>
             </div>

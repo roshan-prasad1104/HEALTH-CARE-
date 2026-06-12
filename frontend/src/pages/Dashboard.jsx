@@ -1,10 +1,12 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { MessageSquare, BarChart2, BookOpen, Volume2, Star, Eye, ArrowRight, Pill } from 'lucide-react';
 
-export default function Dashboard({ setActiveTab }) {
+export default function Dashboard() {
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { elderlyMode, largeFont, darkMode } = useSelector(state => state.settings);
   const { getHoverSpeechProps, speakText } = useAccessibility();
@@ -153,7 +155,7 @@ export default function Dashboard({ setActiveTab }) {
         {cards.map(card => (
           <div
             key={card.id}
-            onClick={() => setActiveTab(card.id)}
+            onClick={() => navigate('/' + card.id)}
             {...getHoverSpeechProps(`${card.title}. ${card.desc}`, i18n.language)}
             className={`group module-card module-card-${card.id}`}
           >

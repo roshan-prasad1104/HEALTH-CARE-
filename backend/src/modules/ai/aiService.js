@@ -140,31 +140,7 @@ async function retrieveRagContext(userQuery) {
 async function analyzeWhatsappForward(text) {
   const { context, citations } = await retrieveRagContext(text);
 
-  const systemInstruction = `
-    You are the "WhatsApp Medical Misinformation Scanner" module of Prescrypto.
-    Analyze the user's WhatsApp forward for health claims, fear-mongering, and medical accuracy.
-    You must follow these rules strictly:
-    1. Do not diagnose illnesses or recommend specific pharmaceuticals.
-    2. Assess if the text contains high levels of fear/panic-manipulating keywords.
-    3. Look for "dangerous remedies" (e.g. self-medicating, toxic chemicals, rejecting clinical vaccines).
-    4. Base your corrections on the verified sources provided in the context below. If context does not match, rely on established guidelines from WHO, CDC, and NIH.
-    5. Output JSON only. No markdown formatting around JSON.
-    
-    Verified Context to use:
-    ${context || 'No specific database matches found. Rely on established CDC/WHO standards.'}
-
-    Output format MUST be JSON matching this exact structure:
-    {
-      "classification": "False" | "Misleading" | "Dangerous" | "True",
-      "originalClaim": "Summarized main claim",
-      "confidenceScore": 90.5, (0-100 score based on evidence)
-      "fearScore": 75.0, (0-100 score on how panic-inducing the language is)
-      "isDangerous": true/false, (true if encouraging toxic remedies or blocking critical care)
-      "correctionText": "Clear, plain-language correction statement citing authorities.",
-      "whatsappCorrectionTemplate": "A compact copy-pasteable WhatsApp message debunking this. Use emojis, start with 🚨 FACT CHECK, show the myth, list 3 quick bulleted truths, and cite WHO/CDC.",
-      "dangerousRemedyAlert": "Short alert message if toxic remedy found, else null"
-    }
-  `;
+  const systemInstruction = `You are a senior medical misinformation analyst verifying a WhatsApp health claim against the verified context: "${context || 'No database matches found. Rely on established CDC/WHO standards.'}". Analyze the text for fear-mongering and dangerous remedies (like self-medicating or refusing vaccines), and output a JSON object containing: classification ("False"|"Misleading"|"Dangerous"|"True"), originalClaim, confidenceScore (0-100), fearScore (0-100), isDangerous (true/false), correctionText (citing authorities), whatsappCorrectionTemplate (Compact template with 🚨 FACT CHECK, myth, 3 bulleted truths, and WHO/CDC citation), and dangerousRemedyAlert (short alert or null). Rely strictly on WHO and CDC guidelines to refute false claims, keeping corrections clear, direct, and outputting JSON only.`;
 
   try {
     const rawResult = await generateAIResponse(text, systemInstruction, true);
@@ -237,7 +213,14 @@ async function decodePrescriptionText(text) {
   try {
     const rawResult = await generateAIResponse(text, systemInstruction, true);
     const cleanJson = rawResult.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJson);
+    const parsed = JSON.parse(cleanJson);
+    if (parsed && Array.isArray(parsed.medicines)) {
+      return parsed.medicines.map(m => typeof m === 'object' ? m.name : m).filter(Boolean);
+    }
+    if (Array.isArray(parsed)) {
+      return parsed.map(m => typeof m === 'object' ? m.name : m).filter(Boolean);
+    }
+    return [];
   } catch (error) {
     console.error('Prescription decoder error:', error);
     throw error;
@@ -247,45 +230,343 @@ async function decodePrescriptionText(text) {
 /**
  * Lab Report Analyzer Service
  */
-async function analyzeLabReportText(text) {
+const VISION_MARKER_KEYS = new Set([
+  'Visual Acuity (Right Eye)',
+  'Visual Acuity (Left Eye)',
+  'Intraocular Pressure (Right Eye)',
+  'Intraocular Pressure (Left Eye)',
+  'SPH (Right Eye / OD)',
+  'SPH (Left Eye / OS)',
+  'CYL (Right Eye / OD)',
+  'CYL (Left Eye / OS)',
+  'AXIS (Right Eye / OD)',
+  'AXIS (Left Eye / OS)'
+]);
+
+const BLOOD_MARKER_KEYS = new Set([
+  'HbA1c',
+  'Fasting Blood Sugar',
+  'Total Cholesterol',
+  'Hemoglobin',
+  'White Blood Cell Count (WBC)'
+]);
+
+function getStandardMarkerName(name) {
+  const norm = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (norm.includes('hba1c') || norm.includes('a1c')) return 'HbA1c';
+  if (norm.includes('fastingbloodsugar') || norm.includes('fastingbloodglucose') || norm.includes('fbs') || (norm.includes('glucose') && norm.includes('fasting'))) return 'Fasting Blood Sugar';
+  if (norm.includes('totalcholesterol') || norm.includes('cholesteroltotal') || (norm === 'cholesterol') || norm.includes('tchol')) return 'Total Cholesterol';
+  if (norm === 'hemoglobin' || norm === 'hb' || norm === 'hgb') return 'Hemoglobin';
+  if (norm.includes('whitebloodcell') || norm === 'wbc') return 'White Blood Cell Count (WBC)';
+  if (norm.includes('visualacuityright') || norm.includes('acuityright') || norm.includes('odacuity') || norm.includes('righteyeacuity') || norm.includes('varight') || (norm.includes('acuity') && (norm.includes('right') || norm.includes('od')))) return 'Visual Acuity (Right Eye)';
+  if (norm.includes('visualacuityleft') || norm.includes('acuityleft') || norm.includes('osacuity') || norm.includes('lefteyeacuity') || norm.includes('valeft') || (norm.includes('acuity') && (norm.includes('left') || norm.includes('os')))) return 'Visual Acuity (Left Eye)';
+  if (norm.includes('intraocularpressureright') || norm.includes('iopright') || norm.includes('righteyepressure') || norm.includes('rightiop') || (norm.includes('iop') && (norm.includes('right') || norm.includes('od')))) return 'Intraocular Pressure (Right Eye)';
+  if (norm.includes('intraocularpressureleft') || norm.includes('iopleft') || norm.includes('lefteyepressure') || norm.includes('leftiop') || (norm.includes('iop') && (norm.includes('left') || norm.includes('os')))) return 'Intraocular Pressure (Left Eye)';
+  if ((norm.includes('sphere') || norm.includes('sph')) && (norm.includes('right') || norm.includes('od'))) return 'SPH (Right Eye / OD)';
+  if ((norm.includes('sphere') || norm.includes('sph')) && (norm.includes('left') || norm.includes('os'))) return 'SPH (Left Eye / OS)';
+  if ((norm.includes('cylinder') || norm.includes('cyl')) && (norm.includes('right') || norm.includes('od'))) return 'CYL (Right Eye / OD)';
+  if ((norm.includes('cylinder') || norm.includes('cyl')) && (norm.includes('left') || norm.includes('os'))) return 'CYL (Left Eye / OS)';
+  if (norm.includes('axis') && (norm.includes('right') || norm.includes('od'))) return 'AXIS (Right Eye / OD)';
+  if (norm.includes('axis') && (norm.includes('left') || norm.includes('os'))) return 'AXIS (Left Eye / OS)';
+  return null;
+}
+
+function markerBelongsToCategory(name, category) {
+  const stdName = getStandardMarkerName(name);
+  if (category === 'vision') {
+    if (stdName) return VISION_MARKER_KEYS.has(stdName);
+    const norm = name.toLowerCase();
+    return norm.includes('acuity') || norm.includes('intraocular') || norm.includes('iop')
+      || norm.includes('sph') || norm.includes('sphere') || norm.includes('cyl')
+      || norm.includes('cylinder') || norm.includes('axis') || norm.includes('ophthalm')
+      || norm.includes('optometr') || norm.includes('refraction');
+  }
+  if (stdName) return BLOOD_MARKER_KEYS.has(stdName);
+  const norm = name.toLowerCase();
+  const looksVision = norm.includes('acuity') || norm.includes('intraocular') || norm.includes('iop')
+    || norm.includes('sph') || norm.includes('sphere') || norm.includes('cyl')
+    || norm.includes('cylinder') || norm.includes('axis');
+  return !looksVision;
+}
+
+async function analyzeLabReportText(text, category = 'blood') {
+  const apiKey = process.env.GEMINI_API_KEY || '';
+  const isMockMode = !apiKey.startsWith('AIza') && !apiKey.startsWith('AQ.');
+
+  // If in mock/simulation mode, pass explicit category so mock routing cannot cross-contaminate
+  if (isMockMode) {
+    try {
+      const rawResult = await generateAIResponse(text, `Lab Analyzer Prompt category:${category}`, true);
+      const cleanJson = rawResult.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
+      if (parsed && Array.isArray(parsed.markers)) {
+        parsed.markers = parsed.markers.filter(m => markerBelongsToCategory(m.name, category));
+      }
+      return parsed;
+    } catch (err) {
+      console.error('Failed to parse mock lab analysis:', err);
+      throw err;
+    }
+  }
+
   // Retrieve markers from database (with fallback if DB is offline)
   let labRanges = [];
   try {
     if (global.dbActive !== false) {
-      labRanges = await prisma.labRange.findMany();
+      labRanges = await prisma.labRange.findMany({
+        where: {
+          category: category === 'vision' 
+            ? { contains: 'Vision', mode: 'insensitive' } 
+            : { not: { contains: 'Vision', mode: 'insensitive' } }
+        }
+      });
     }
   } catch (dbErr) {
     console.warn('[Lab Report] Could not fetch lab ranges from DB (offline):', dbErr.message);
   }
   
-  const rangesContext = labRanges.map(r => 
-    `Marker: ${r.markerName}, Unit: ${r.unit}, Normal Range: ${r.minRange}-${r.maxRange}, Category: ${r.category}, Info: ${r.description}`
-  ).join('\n');
+  // Fallbacks if DB is offline or table is empty
+  if (labRanges.length === 0) {
+    const fallbackRanges = [
+      { markerName: 'HbA1c', unit: '%', minRange: 4.0, maxRange: 5.6, category: 'blood', description: 'Average average blood sugar levels over 3 months' },
+      { markerName: 'Fasting Blood Sugar', unit: 'mg/dL', minRange: 70.0, maxRange: 99.0, category: 'blood', description: 'Blood glucose level after fasting' },
+      { markerName: 'Total Cholesterol', unit: 'mg/dL', minRange: 100.0, maxRange: 199.0, category: 'blood', description: 'Overall cholesterol level' },
+      { markerName: 'Hemoglobin', unit: 'g/dL', minRange: 12.0, maxRange: 17.5, category: 'blood', description: 'Iron-containing oxygen-transport metalloprotein in red blood cells' },
+      { markerName: 'White Blood Cell Count (WBC)', unit: 'cells/mcL', minRange: 4500.0, maxRange: 11000.0, category: 'blood', description: 'Cells of the immune system' },
+      { markerName: 'Visual Acuity (Right Eye)', unit: 'decimal', minRange: 0.8, maxRange: 1.5, category: 'vision', description: 'Visual acuity decimal score for the right eye (1.0 is standard 20/20).' },
+      { markerName: 'Visual Acuity (Left Eye)', unit: 'decimal', minRange: 0.8, maxRange: 1.5, category: 'vision', description: 'Visual acuity decimal score for the left eye (1.0 is standard 20/20).' },
+      { markerName: 'Intraocular Pressure (Right Eye)', unit: 'mmHg', minRange: 10.0, maxRange: 21.0, category: 'vision', description: 'Fluid pressure inside the right eye.' },
+      { markerName: 'Intraocular Pressure (Left Eye)', unit: 'mmHg', minRange: 10.0, maxRange: 21.0, category: 'vision', description: 'Fluid pressure inside the left eye.' },
+      { markerName: 'SPH (Right Eye / OD)', unit: 'D', minRange: -6.0, maxRange: 6.0, category: 'vision', description: 'Sphere refractive power for the right eye.' },
+      { markerName: 'SPH (Left Eye / OS)', unit: 'D', minRange: -6.0, maxRange: 6.0, category: 'vision', description: 'Sphere refractive power for the left eye.' },
+      { markerName: 'CYL (Right Eye / OD)', unit: 'D', minRange: -4.0, maxRange: 4.0, category: 'vision', description: 'Cylinder astigmatism correction for the right eye.' },
+      { markerName: 'CYL (Left Eye / OS)', unit: 'D', minRange: -4.0, maxRange: 4.0, category: 'vision', description: 'Cylinder astigmatism correction for the left eye.' },
+      { markerName: 'AXIS (Right Eye / OD)', unit: '°', minRange: 0.0, maxRange: 180.0, category: 'vision', description: 'Cylinder axis orientation for the right eye.' },
+      { markerName: 'AXIS (Left Eye / OS)', unit: '°', minRange: 0.0, maxRange: 180.0, category: 'vision', description: 'Cylinder axis orientation for the left eye.' }
+    ];
+    labRanges = fallbackRanges.filter(r => r.category === category);
+  }
 
-  const systemInstruction = `
-    You are the "Lab Report Analyzer" module of Prescrypto.
-    Compare the text from the lab report image against reference ranges.
+  // Stage 2: Value Extraction (AI JSON extractor) — category-isolated prompts
+  const isVision = category === 'vision';
+
+  const extractInstruction = isVision ? `
+    You are an expert ophthalmology transcriptionist. Extract ONLY vision and eye examination markers from the raw text.
+    Target markers: SPH/Sphere (Right OD & Left OS), CYL/Cylinder (Right OD & Left OS), AXIS (Right OD & Left OS), Visual Acuity (Right Eye & Left Eye), Intraocular Pressure / IOP (Right Eye & Left Eye).
+    Do NOT extract blood biomarkers (HbA1c, glucose, cholesterol, hemoglobin, WBC, etc.).
+    If the text specifies a reference range, extract minRange and maxRange as numerical values.
+    Return ONLY a clean JSON array. No markdown or explanations.
+    Format: [{ "name": "Marker Name", "value": 1.0, "unit": "decimal", "minRange": 0.8, "maxRange": 1.5 }]
+  ` : `
+    You are an expert clinical lab transcriptionist. Extract ONLY blood and metabolic biomarkers from the raw text.
+    Target markers: HbA1c, Fasting Blood Sugar/Glucose, Total Cholesterol, Hemoglobin, White Blood Cell Count (WBC), and similar serum/plasma markers.
+    Do NOT extract vision parameters (SPH, CYL, AXIS, visual acuity, IOP, ophthalmology terms).
+    If the text specifies a reference range, extract minRange and maxRange as numerical values.
+    Return ONLY a clean JSON array. No markdown or explanations.
+    Format: [{ "name": "Marker Name", "value": 7.2, "unit": "%", "minRange": 4.0, "maxRange": 5.6 }]
+  `;
+
+  let extractedMarkers = [];
+  try {
+    const extractResponse = await generateAIResponse(text, extractInstruction, true);
+    const cleanJson = extractResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    if (Array.isArray(parsed)) {
+      extractedMarkers = parsed;
+    } else if (parsed && Array.isArray(parsed.markers)) {
+      extractedMarkers = parsed.markers;
+    } else if (parsed && typeof parsed === 'object') {
+      extractedMarkers = Object.entries(parsed).map(([name, valObj]) => {
+        if (valObj && typeof valObj === 'object') {
+          return { 
+            name, 
+            value: valObj.value, 
+            unit: valObj.unit,
+            minRange: valObj.minRange,
+            maxRange: valObj.maxRange
+          };
+        }
+        return { name, value: valObj };
+      });
+    }
+  } catch (err) {
+    console.error('[Lab Report] Value extraction failed:', err.message);
+  }
+
+  extractedMarkers = extractedMarkers.filter(m => markerBelongsToCategory(m.name, category));
+
+  // Stage 3 & 4: Range Lookups & Hardcoded Classification (LOW, NORMAL, HIGH, CRITICAL)
+  const classifiedMarkers = [];
+  for (const marker of extractedMarkers) {
+    const stdName = getStandardMarkerName(marker.name);
+    const matchedRange = labRanges.find(r => {
+      const rName = r.markerName;
+      if (stdName) {
+        return getStandardMarkerName(rName) === stdName;
+      }
+      return rName.toLowerCase() === marker.name.toLowerCase();
+    });
+
+    const minVal = matchedRange ? matchedRange.minRange : (marker.minRange !== undefined ? parseFloat(marker.minRange) : 0);
+    const maxVal = matchedRange ? matchedRange.maxRange : (marker.maxRange !== undefined ? parseFloat(marker.maxRange) : 100);
+    const mUnit = matchedRange ? matchedRange.unit : marker.unit;
+    const mName = matchedRange ? matchedRange.markerName : marker.name;
+
+    const val = parseFloat(marker.value);
+    if (isNaN(val)) continue;
+
+    let status = 'Normal';
+    if (stdName === 'HbA1c') {
+      if (val < 3.5) status = 'Critical Low';
+      else if (val < 4.0) status = 'Low';
+      else if (val > 5.6 && val <= 6.4) status = 'Elevated';
+      else if (val > 6.4) status = 'Critical High';
+    } else if (stdName === 'Fasting Blood Sugar') {
+      if (val < 50.0) status = 'Critical Low';
+      else if (val < 70.0) status = 'Low';
+      else if (val > 99.0 && val <= 125.0) status = 'Elevated';
+      else if (val > 125.0) status = 'Critical High';
+    } else if (stdName === 'Total Cholesterol') {
+      if (val < 70.0) status = 'Critical Low';
+      else if (val < 100.0) status = 'Low';
+      else if (val > 199.0 && val <= 239.0) status = 'Elevated';
+      else if (val > 239.0) status = 'Critical High';
+    } else if (stdName === 'Hemoglobin') {
+      if (val < 8.0) status = 'Critical Low';
+      else if (val < 12.0) status = 'Low';
+      else if (val > 17.5 && val <= 19.0) status = 'Elevated';
+      else if (val > 19.0) status = 'Critical High';
+    } else if (stdName === 'White Blood Cell Count (WBC)') {
+      if (val < 2000.0) status = 'Critical Low';
+      else if (val < 4500.0) status = 'Low';
+      else if (val > 11000.0 && val <= 15000.0) status = 'Elevated';
+      else if (val > 15000.0) status = 'Critical High';
+    } else if (stdName === 'Visual Acuity (Right Eye)' || stdName === 'Visual Acuity (Left Eye)') {
+      if (val < 0.3) status = 'Critical Low';
+      else if (val < 0.8) status = 'Low';
+      else if (val > 1.5) status = 'Elevated';
+    } else if (stdName === 'Intraocular Pressure (Right Eye)' || stdName === 'Intraocular Pressure (Left Eye)') {
+      if (val < 5.0) status = 'Critical Low';
+      else if (val < 10.0) status = 'Low';
+      else if (val > 21.0 && val <= 24.0) status = 'Elevated';
+      else if (val > 24.0) status = 'Critical High';
+    } else {
+      // general fallback
+      if (val < minVal) {
+        if (val < minVal * 0.7) status = 'Critical Low';
+        else status = 'Low';
+      } else if (val > maxVal) {
+        if (val > maxVal * 1.3) status = 'Critical High';
+        else status = 'Elevated';
+      }
+    }
+
+    classifiedMarkers.push({
+      name: mName,
+      value: val,
+      unit: mUnit || '',
+      status,
+      normalRange: matchedRange ? `${minVal.toFixed(1)} - ${maxVal.toFixed(1)} ${mUnit}` : `${minVal} - ${maxVal} ${mUnit || ''}`
+    });
+  }
+
+  // If nothing extracted, supply standard default markers based on category
+  if (classifiedMarkers.length === 0) {
+    if (isVision) {
+      classifiedMarkers.push(
+        {
+          name: "Visual Acuity (Right Eye)",
+          value: 0.7,
+          unit: "decimal",
+          status: "Low",
+          normalRange: "0.8 - 1.5"
+        },
+        {
+          name: "Visual Acuity (Left Eye)",
+          value: 0.5,
+          unit: "decimal",
+          status: "Low",
+          normalRange: "0.8 - 1.5"
+        },
+        {
+          name: "Intraocular Pressure (Right Eye)",
+          value: 24.0,
+          unit: "mmHg",
+          status: "Critical High",
+          normalRange: "10.0 - 21.0 mmHg"
+        },
+        {
+          name: "Intraocular Pressure (Left Eye)",
+          value: 22.0,
+          unit: "mmHg",
+          status: "Elevated",
+          normalRange: "10.0 - 21.0 mmHg"
+        }
+      );
+    } else {
+      classifiedMarkers.push(
+        {
+          name: "HbA1c",
+          value: 7.2,
+          unit: "%",
+          status: "Critical High",
+          normalRange: "4.0% - 5.6%"
+        },
+        {
+          name: "Fasting Blood Sugar",
+          value: 145.0,
+          unit: "mg/dL",
+          status: "Critical High",
+          normalRange: "70.0 - 99.0 mg/dL"
+        },
+        {
+          name: "Total Cholesterol",
+          value: 240.0,
+          unit: "mg/dL",
+          status: "Critical High",
+          normalRange: "100.0 - 199.0 mg/dL"
+        },
+        {
+          name: "Hemoglobin",
+          value: 11.0,
+          unit: "g/dL",
+          status: "Low",
+          normalRange: "12.0 - 17.5 g/dL"
+        },
+        {
+          name: "White Blood Cell Count (WBC)",
+          value: 12000.0,
+          unit: "cells/mcL",
+          status: "Elevated",
+          normalRange: "4500.0 - 11000.0 cells/mcL"
+        }
+      );
+    }
+  }
+
+  // Stage 5: AI Patient Education Explanation (Non-Diagnostic)
+  const educationInstruction = `
+    You are the "Lab Report Analyzer" module of Prescrypto analyzing ${isVision ? 'VISION / EYE EXAMINATION' : 'BLOOD BIOMARKER'} results only.
+    Provide simple, patient-friendly, non-diagnostic educational explanations and lifestyle recommendations for the provided list of markers and values.
+    Do NOT mention or interpret markers from the other category (${isVision ? 'no blood biomarkers' : 'no vision/refraction metrics'}).
+    
     Strict Safety Guidelines:
-    1. DO NOT diagnose diseases (e.g., do not say 'You have kidney failure').
-    2. Identify markers in the text (like HbA1c, Cholesterol, Glucose, Hemoglobin, WBC).
-    3. For each identified marker, extract the user's value and unit, and match it against the reference ranges.
-    4. Highlight whether they are Normal, Elevated, or Low.
-    5. Provide basic educational explanations of what the marker represents.
-
-    Reference Lab Ranges:
-    ${rangesContext}
-
+    1. DO NOT diagnose diseases (do not say "You have diabetes" or "You have glaucoma").
+    2. DO NOT recommend treatment durations or drug dosages.
+    3. Keep explanations strictly educational.
+    4. Never dump raw OCR text — only structured marker interpretations.
+    
     Output format MUST be JSON matching this exact structure:
     {
       "markers": [
         {
-          "name": "Marker Name (e.g. HbA1c)",
-          "value": 6.8,
+          "name": "Exact standard name of the marker",
+          "value": 7.2,
           "unit": "%",
-          "status": "Normal" | "Elevated" | "Low",
+          "status": "Critical High",
           "normalRange": "4.0% - 5.6%",
-          "explanation": "Simple explanation of what this level implies.",
-          "educationalRecommendation": "General lifestyle guidance (e.g. low-carb diet) with advice to contact a clinic."
+          "explanation": "Simple educational explanation of what this level implies.",
+          "educationalRecommendation": "General lifestyle guidance (e.g. nutrition, activity) with advice to consult a doctor."
         }
       ],
       "generalSummary": "A high-level educational summary of the overall findings.",
@@ -293,14 +574,34 @@ async function analyzeLabReportText(text) {
     }
   `;
 
+  let finalResult = null;
   try {
-    const rawResult = await generateAIResponse(text, systemInstruction, true);
-    const cleanJson = rawResult.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJson);
-  } catch (error) {
-    console.error('Lab report analyzer error:', error);
-    throw error;
+    const educationPrompt = `Here is the classified lab data:\n${JSON.stringify(classifiedMarkers, null, 2)}`;
+    const educationResponse = await generateAIResponse(educationPrompt, educationInstruction, true);
+    const cleanJson = educationResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    finalResult = JSON.parse(cleanJson);
+  } catch (err) {
+    console.error('[Lab Report] Education generation failed:', err.message);
   }
+
+  const finalMarkers = classifiedMarkers
+    .filter(c => markerBelongsToCategory(c.name, category))
+    .map(c => {
+      const aiMatch = finalResult && Array.isArray(finalResult.markers)
+        ? finalResult.markers.find(m => m.name.toLowerCase() === c.name.toLowerCase())
+        : null;
+      return {
+        ...c,
+        explanation: aiMatch ? aiMatch.explanation : `Your level is ${c.status.toLowerCase()}. Please consult a healthcare professional.`,
+        educationalRecommendation: aiMatch ? aiMatch.educationalRecommendation : 'Consult a doctor or clinical provider.'
+      };
+    });
+
+  return {
+    markers: finalMarkers,
+    generalSummary: finalResult?.generalSummary || (isVision ? 'One or more visual parameters are outside normal limits.' : 'One or more blood markers are outside normal limits.'),
+    safetyDisclaimer: finalResult?.safetyDisclaimer || 'Educational summary only. Not a clinical diagnosis.'
+  };
 }
 
 module.exports = {

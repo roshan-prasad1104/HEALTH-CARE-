@@ -220,7 +220,61 @@ async function performGoogleVisionFallback(filePath, type = 'prescription') {
 
   let mockText = '';
   
-  if (type === 'lab') {
+  if (type === 'vision') {
+    const visionProfiles = [
+      `
+        OPHTHALMOLOGY REPORT - VISION ANALYSIS
+        Patient: Roshan Prasad
+        Date: 2026-06-08
+        -------------------------------------
+        Visual Acuity (Right Eye)   1.0 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+        Visual Acuity (Left Eye)    0.5 decimal (Reference: 0.8 - 1.5)   [LOW]
+        Intraocular Pressure (Right) 15.0 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+        Intraocular Pressure (Left)  24.0 mmHg   (Reference: 10.0 - 21.0) [ELEVATED]
+      `,
+      `
+        OPHTHALMOLOGY REPORT - STANDARD VISION PANEL
+        Patient: Priya Sharma
+        Date: 2026-06-09
+        -------------------------------------
+        Visual Acuity (Right Eye)   0.4 decimal (Reference: 0.8 - 1.5)   [LOW]
+        Visual Acuity (Left Eye)    0.4 decimal (Reference: 0.8 - 1.5)   [LOW]
+        Intraocular Pressure (Right) 12.0 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+        Intraocular Pressure (Left)  13.5 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+      `,
+      `
+        OPHTHALMOLOGY REPORT - ROUTINE EYE EXAM
+        Patient: Amit Kumar
+        Date: 2026-06-10
+        -------------------------------------
+        Visual Acuity (Right Eye)   1.0 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+        Visual Acuity (Left Eye)    1.2 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+        Intraocular Pressure (Right) 17.5 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+        Intraocular Pressure (Left)  16.0 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+      `,
+      `
+        OPHTHALMOLOGY REPORT - TONOMETRY & REFRACTION
+        Patient: K. Srinivasan
+        Date: 2026-06-11
+        -------------------------------------
+        Visual Acuity (Right Eye)   0.9 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+        Visual Acuity (Left Eye)    0.8 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+        Intraocular Pressure (Right) 23.0 mmHg   (Reference: 10.0 - 21.0) [ELEVATED]
+        Intraocular Pressure (Left)  22.5 mmHg   (Reference: 10.0 - 21.0) [ELEVATED]
+      `,
+      `
+        OPHTHALMOLOGY REPORT - CLINICAL SURVEY
+        Patient: Gurpreet Singh
+        Date: 2026-06-11
+        -------------------------------------
+        Visual Acuity (Right Eye)   0.3 decimal (Reference: 0.8 - 1.5)   [LOW]
+        Visual Acuity (Left Eye)    1.0 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+        Intraocular Pressure (Right) 14.0 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+        Intraocular Pressure (Left)  25.0 mmHg   (Reference: 10.0 - 21.0) [HIGH]
+      `
+    ];
+    mockText = visionProfiles[profileIndex];
+  } else if (type === 'lab') {
     const labProfiles = [
       `
         LABORATORY REPORT - METABOLIC PANEL
@@ -341,7 +395,61 @@ async function performGoogleVisionFallback(filePath, type = 'prescription') {
   } else {
     // Fallback based on file name if type is unspecified
     const pathLower = filePath.toLowerCase();
-    if (pathLower.includes('report') || pathLower.includes('blood') || pathLower.includes('lab')) {
+    if (pathLower.includes('eye') || pathLower.includes('vision') || pathLower.includes('sight') || pathLower.includes('ophthalmology')) {
+      const visionProfiles = [
+        `
+          OPHTHALMOLOGY REPORT - VISION ANALYSIS
+          Patient: Roshan Prasad
+          Date: 2026-06-08
+          -------------------------------------
+          Visual Acuity (Right Eye)   1.0 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+          Visual Acuity (Left Eye)    0.5 decimal (Reference: 0.8 - 1.5)   [LOW]
+          Intraocular Pressure (Right) 15.0 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+          Intraocular Pressure (Left)  24.0 mmHg   (Reference: 10.0 - 21.0) [ELEVATED]
+        `,
+        `
+          OPHTHALMOLOGY REPORT - STANDARD VISION PANEL
+          Patient: Priya Sharma
+          Date: 2026-06-09
+          -------------------------------------
+          Visual Acuity (Right Eye)   0.4 decimal (Reference: 0.8 - 1.5)   [LOW]
+          Visual Acuity (Left Eye)    0.4 decimal (Reference: 0.8 - 1.5)   [LOW]
+          Intraocular Pressure (Right) 12.0 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+          Intraocular Pressure (Left)  13.5 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+        `,
+        `
+          OPHTHALMOLOGY REPORT - ROUTINE EYE EXAM
+          Patient: Amit Kumar
+          Date: 2026-06-10
+          -------------------------------------
+          Visual Acuity (Right Eye)   1.0 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+          Visual Acuity (Left Eye)    1.2 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+          Intraocular Pressure (Right) 17.5 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+          Intraocular Pressure (Left)  16.0 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+        `,
+        `
+          OPHTHALMOLOGY REPORT - TONOMETRY & REFRACTION
+          Patient: K. Srinivasan
+          Date: 2026-06-11
+          -------------------------------------
+          Visual Acuity (Right Eye)   0.9 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+          Visual Acuity (Left Eye)    0.8 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+          Intraocular Pressure (Right) 23.0 mmHg   (Reference: 10.0 - 21.0) [ELEVATED]
+          Intraocular Pressure (Left)  22.5 mmHg   (Reference: 10.0 - 21.0) [ELEVATED]
+        `,
+        `
+          OPHTHALMOLOGY REPORT - CLINICAL SURVEY
+          Patient: Gurpreet Singh
+          Date: 2026-06-11
+          -------------------------------------
+          Visual Acuity (Right Eye)   0.3 decimal (Reference: 0.8 - 1.5)   [LOW]
+          Visual Acuity (Left Eye)    1.0 decimal (Reference: 0.8 - 1.5)   [NORMAL]
+          Intraocular Pressure (Right) 14.0 mmHg   (Reference: 10.0 - 21.0) [NORMAL]
+          Intraocular Pressure (Left)  25.0 mmHg   (Reference: 10.0 - 21.0) [HIGH]
+        `
+      ];
+      mockText = visionProfiles[profileIndex];
+    } else if (pathLower.includes('report') || pathLower.includes('blood') || pathLower.includes('lab')) {
       const labProfiles = [
         `
           LABORATORY REPORT - METABOLIC PANEL

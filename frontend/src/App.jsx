@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import WhatsAppScanner from './pages/WhatsAppScanner';
@@ -13,7 +13,6 @@ import ForgotPassword from './pages/ForgotPassword';
 import { Sparkles, HelpCircle } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
   const { largeFont, darkMode } = useSelector(state => state.settings);
   const user = useSelector(state => state.auth?.user);
 
@@ -30,44 +29,43 @@ export default function App() {
     }
   }, [darkMode]);
 
-  const renderActiveTab = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard setActiveTab={setActiveTab} />;
-      case 'scanner':
-        return <WhatsAppScanner />;
-      case 'prescription':
-        return <PrescriptionDecoder />;
-      case 'lab':
-        return <LabAnalyzer />;
-      case 'learning':
-        return <LearningHub />;
-      default:
-        return <Dashboard setActiveTab={setActiveTab} />;
-    }
-  };
-
   return (
     <Routes>
+      {/* Public auth pages */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/dashboard" element={user ? <MainApp activeTab={activeTab} setActiveTab={setActiveTab} largeFont={largeFont} renderActiveTab={renderActiveTab} /> : <Navigate to="/login" />} />
-      <Route path="/" element={user ? <MainApp activeTab={activeTab} setActiveTab={setActiveTab} largeFont={largeFont} renderActiveTab={renderActiveTab} /> : <Navigate to="/login" />} />
+
+      {/* Main app layout wrapper */}
+      <Route path="/" element={user ? <MainApp largeFont={largeFont} /> : <Navigate to="/login" replace />}>
+        {/* Child tab routes */}
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="scanner" element={<WhatsAppScanner />} />
+        <Route path="prescription" element={<PrescriptionDecoder />} />
+        <Route path="lab" element={<LabAnalyzer />} />
+        <Route path="learning" element={<LearningHub />} />
+        
+        {/* Fallback within MainApp to dashboard */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Route>
+
+      {/* Global fallback */}
+      <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
     </Routes>
   );
 }
 
-function MainApp({ activeTab, setActiveTab, largeFont, renderActiveTab }) {
+function MainApp({ largeFont }) {
   return (
     <div className={`min-h-screen flex flex-col justify-between transition-all duration-300 ${largeFont ? 'text-[17px]' : 'text-[14px]'}`} style={{ background: 'transparent' }}>
       <div>
         {/* Navigation Header */}
-        <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <Navbar />
 
         {/* Content Shell */}
         <main className="pb-16 animate-fade-in">
-          {renderActiveTab()}
+          <Outlet />
         </main>
       </div>
 

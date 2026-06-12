@@ -1,28 +1,53 @@
-import { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate, Link, Navigate, useLocation } from 'react-router-dom';
 import { Shield } from 'lucide-react';
 import { loginSuccess } from '../store/authSlice';
 
 export default function Login() {
+  const user = useSelector(state => state.auth?.user);
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [showSuccessBanner, setShowSuccessBanner] = useState(!!location.state?.registered);
+
+  useEffect(() => {
+    if (showSuccessBanner) {
+      const timer = setTimeout(() => {
+        setShowSuccessBanner(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessBanner]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
 
       const contentType = response.headers.get('content-type');
@@ -100,6 +125,16 @@ export default function Login() {
             Welcome back 👋
           </h2>
 
+          {/* Success Banner */}
+          {showSuccessBanner && (
+            <div style={{ padding: '0.875rem 1rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '0.75rem', color: '#a7f3d0', fontSize: '0.875rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              Account created successfully. Please login.
+            </div>
+          )}
+
           {/* Error */}
           {error && (
             <div className="error-box" style={{ marginBottom: '1.25rem' }}>
@@ -121,7 +156,10 @@ export default function Login() {
                 type="email"
                 className="auth-input"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setShowSuccessBanner(false);
+                }}
                 placeholder="you@example.com"
                 required
                 autoComplete="email"
@@ -139,7 +177,10 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   className="auth-input"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setShowSuccessBanner(false);
+                  }}
                   placeholder="••••••••"
                   required
                   autoComplete="current-password"
@@ -155,8 +196,26 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Forgot password */}
-            <div style={{ textAlign: 'right', marginBottom: '1.5rem' }}>
+            {/* Remember me & Forgot password */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: '#94a3b8', userSelect: 'none' }}>
+                <input
+                  id="login-remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{
+                    accentColor: '#6366f1',
+                    cursor: 'pointer',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '4px',
+                    border: '1.5px solid rgba(255,255,255,0.08)',
+                    background: 'rgba(15,23,42,0.6)'
+                  }}
+                />
+                Remember me
+              </label>
               <Link to="/forgot-password" className="link-text" style={{ fontSize: '0.8125rem' }}>
                 Forgot password?
               </Link>
