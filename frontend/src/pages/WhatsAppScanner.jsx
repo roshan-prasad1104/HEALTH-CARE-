@@ -104,14 +104,13 @@ const getLocalizedLabel = (key, lang) => {
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import { useAccessibility } from '../context/AccessibilityContext';
-import { Upload, Clipboard, Send, RefreshCw, AlertTriangle, CheckCircle2, ShieldAlert, ExternalLink, Share2, Volume2, VolumeX } from 'lucide-react';
+import { Clipboard, Send, RefreshCw, AlertTriangle, CheckCircle2, ShieldAlert, ExternalLink, Share2, Volume2, VolumeX } from 'lucide-react';
 
 export default function WhatsAppScanner() {
   const { t, i18n } = useTranslation();
   const { largeFont, darkMode } = useSelector(state => state.settings);
 
   const [textInput, setTextInput] = useState(() => sessionStorage.getItem('wp_textInput') || '');
-  const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(() => {
     const saved = sessionStorage.getItem('wp_result');
@@ -201,43 +200,6 @@ export default function WhatsAppScanner() {
     }
   };
 
-  const handleScreenshotScan = async (e) => {
-    const selectedFile = e.target.files[0];
-    if (!selectedFile) return;
-    
-    setFile(selectedFile);
-    setLoading(true);
-    setError(null);
-    setResult(null);
-
-    const formData = new FormData();
-    formData.append('screenshot', selectedFile);
-
-    try {
-      const response = await fetch('/api/misinformation/scan-screenshot', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Screenshot parse failed');
-
-      const fullRes = {
-        ...data.analysis,
-        extractedText: data.extractedText,
-        ocrConfidence: data.ocrConfidence,
-        ocrSource: data.ocrSource
-      };
-      setOriginalResult(fullRes);
-      setResult(fullRes);
-      speakText(t('speech.scannerScreenshotSuccess', { classification: data.analysis.classification }), i18n.language);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (!originalResult) return;
 
@@ -317,8 +279,8 @@ export default function WhatsAppScanner() {
         </p>
       </div>
 
-      {/* Input grids */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      {/* Input card */}
+      <div className="max-w-xl mx-auto mb-8">
         {/* Paste Text Card */}
         <div className="glass-panel p-6 rounded-2xl flex flex-col justify-between">
           <div>
@@ -341,35 +303,6 @@ export default function WhatsAppScanner() {
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
             {loading ? t('scanner.scanning') : t('scanner.analyzeBtn')}
           </button>
-        </div>
-
-        {/* Screenshot Upload Card */}
-        <div className="glass-panel p-6 rounded-2xl flex flex-col justify-between items-center text-center">
-          <div className="w-full">
-            <h3 className="font-bold mb-3 text-left flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <Upload className="w-4 h-4 text-pink-400" /> Upload Forward Image
-            </h3>
-            
-            <label className="premium-upload-zone">
-              <Upload className="w-8 h-8 mb-3 upload-icon" />
-              <p className="upload-title">
-                {file ? file.name : t('scanner.uploadBtn')}
-              </p>
-              <p className="upload-subtitle">Supports PNG, JPG, WebP up to 5MB</p>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleScreenshotScan}
-                className="hidden"
-              />
-            </label>
-          </div>
-          
-          <div className="w-full text-center mt-4">
-            <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-              OCR is powered by Tesseract.js with automatic Google Vision translation safety backup.
-            </p>
-          </div>
         </div>
       </div>
 
